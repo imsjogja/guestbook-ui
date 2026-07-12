@@ -1,0 +1,888 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import { useCheckin } from '@/hooks';
+import { useGuests } from '@/hooks';
+import {
+  ScanLine,
+  Search,
+  Check,
+  X,
+  UserPlus,
+  Clock,
+  Camera,
+  CameraOff,
+  RefreshCw,
+  ChevronRight,
+  Users,
+  Keyboard,
+  Phone,
+  Mail,
+  Loader2,
+  AlertCircle,
+} from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
+
+// ── Types ────────────────────────────────────────────
+
+// ── Helpers ──────────────────────────────────────────
+
+function getCategoryBadge(category: string) {
+  switch (category) {
+    case 'vip': return <Badge className="bg-[#d4af37] text-white border-0 text-[10px]">VIP</Badge>;
+    case 'family': return <Badge className="bg-[#ffe4e6] text-[#e11d48] border-[#fecdd3] text-[10px]">Keluarga</Badge>;
+    case 'friend': return <Badge className="bg-[#eef2ff] text-[#4f46e5] border-[#c7d2fe] text-[10px]">Teman</Badge>;
+    case 'colleague': return <Badge className="bg-[#f1f5f9] text-[#64748b] border-[#e2e8f0] text-[10px]">Rekan</Badge>;
+    default: return <Badge variant="outline" className="text-[10px]">Lainnya</Badge>;
+  }
+}
+
+function getStatusIcon(status: string) {
+  switch (status) {
+    case 'success':
+      return <div className="w-10 h-10 rounded-full bg-[#10b981] flex items-center justify-center flex-shrink-0"><Check size={20} className="text-white" /></div>;
+    case 'walk_in':
+      return <div className="w-10 h-10 rounded-full bg-[#f59e0b] flex items-center justify-center flex-shrink-0"><UserPlus size={20} className="text-white" /></div>;
+    case 'error':
+      return <div className="w-10 h-10 rounded-full bg-[#f43f5e] flex items-center justify-center flex-shrink-0"><X size={20} className="text-white" /></div>;
+    default:
+      return null;
+  }
+}
+
+function formatTimeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'baru saja';
+  if (diffMin < 60) return `${diffMin} menit lalu`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} jam lalu`;
+  return `${Math.floor(diffHour / 24)} hari lalu`;
+}
+
+// ── Scanner Tab Component ────────────────────────────
+
+function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => void }) {
+  const [scanning, setScanning] = useState(false);
+  const [cameraOn, setCameraOn] = useState(true);
+  const [overlay, setOverlay] = useState<'success' | 'error' | null>(null);
+  const [overlayName, setOverlayName] = useState('');
+  const [overlayError, setOverlayError] = useState('');
+  const scanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const simulateScan = useCallback(() => {
+    setScanning(true);
+    scanTimer.current = setTimeout(() => {
+      const isSuccess = Math.random() > 0.2;
+      if (isSuccess) {
+        const names = ['Diana Wijaya', 'Budi Santoso', 'Citra Lestari', 'Ahmad Fauzi', 'Siti Rahayu', 'Rudi Hartono', 'Eko Prasetyo', 'Lina Kusuma', 'Fajar Nugroho'];
+        const randomName = names[Math.floor(Math.random() * names.length)];
+        setOverlayName(randomName);
+        setOverlay('success');
+        onCheckinSuccess(randomName);
+      } else {
+        setOverlayError('Kode QR tidak valid atau sudah digunakan');
+        setOverlay('error');
+      }
+      setScanning(false);
+    }, 2000);
+  }, [onCheckinSuccess]);
+
+  useEffect(() => {
+    if (cameraOn && !overlay) {
+      const timer = setTimeout(simulateScan, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [cameraOn, overlay, simulateScan]);
+
+  useEffect(() => {
+    if (overlay) {
+      const timer = setTimeout(() => {
+        setOverlay(null);
+        setOverlayName('');
+        setOverlayError('');
+      }, overlay === 'success' ? 2500 : 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [overlay]);
+
+  useEffect(() => {
+    return () => {
+      if (scanTimer.current) clearTimeout(scanTimer.current);
+    };
+  }, []);
+
+  return (
+    <div className="relative">
+      {/* Scanner Viewport */}
+      <div className="relative w-full min-h-[480px] bg-[#0f172a] rounded-2xl overflow-hidden flex items-center justify-center">
+        {/* Simulated camera feed background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#1e293b] via-[#0f172a] to-[#1e293b] opacity-80" />
+        <div className="absolute inset-0" style={{
+          backgroundImage: `radial-gradient(circle at 20% 30%, rgba(79,70,229,0.08) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(16,185,129,0.06) 0%, transparent 50%)`,
+        }} />
+
+        {cameraOn ? (
+          <>
+            {/* Scan frame */}
+            <div className="relative w-[280px] h-[280px]">
+              {/* Corner markers */}
+              <div className="absolute top-0 left-0 w-6 h-6 border-l-[3px] border-t-[3px] border-[#10b981] rounded-tl-sm animate-pulse" />
+              <div className="absolute top-0 right-0 w-6 h-6 border-r-[3px] border-t-[3px] border-[#10b981] rounded-tr-sm animate-pulse" />
+              <div className="absolute bottom-0 left-0 w-6 h-6 border-l-[3px] border-b-[3px] border-[#10b981] rounded-bl-sm animate-pulse" />
+              <div className="absolute bottom-0 right-0 w-6 h-6 border-r-[3px] border-b-[3px] border-[#10b981] rounded-br-sm animate-pulse" />
+
+              {/* Crosshair */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4">
+                <div className="absolute top-1/2 left-0 w-full h-px bg-white/20" />
+                <div className="absolute left-1/2 top-0 h-full w-px bg-white/20" />
+              </div>
+
+              {/* Scanning line animation */}
+              {scanning && (
+                <motion.div
+                  className="absolute left-0 right-0 h-[2px] bg-[#10b981] shadow-[0_0_8px_rgba(16,185,129,0.6)]"
+                  initial={{ top: '0%' }}
+                  animate={{ top: ['0%', '100%', '0%'] }}
+                  transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                />
+              )}
+            </div>
+
+            {/* Status text */}
+            <div className="absolute bottom-24 left-0 right-0 text-center">
+              {scanning ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 size={16} className="animate-spin text-[#94a3b8]" />
+                  <span className="text-[#94a3b8] text-sm">Memindai...</span>
+                </div>
+              ) : (
+                <span className="text-[#64748b] text-sm">Arahkan kode QR ke dalam kotak</span>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="text-center">
+            <CameraOff size={48} className="text-[#334155] mx-auto mb-4" />
+            <p className="text-[#64748b] text-sm">Kamera dimatikan</p>
+            <p className="text-[#475569] text-xs mt-1">Gunakan mode manual untuk check-in</p>
+          </div>
+        )}
+
+        {/* Success Overlay */}
+        <AnimatePresence>
+          {overlay === 'success' && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 bg-[#10b981]/95 flex flex-col items-center justify-center z-10"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 }}
+                className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center mb-6"
+              >
+                <Check size={40} className="text-white" />
+              </motion.div>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="text-white text-2xl font-bold"
+              >
+                Check-in Berhasil!
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="text-white/90 text-base mt-2"
+              >
+                {overlayName}
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="text-white/60 text-xs mt-3 font-mono"
+              >
+                {new Date().toLocaleTimeString('id-ID', { hour12: false })} WIB
+              </motion.p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Error Overlay */}
+        <AnimatePresence>
+          {overlay === 'error' && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 bg-[#f43f5e]/95 flex flex-col items-center justify-center z-10"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 }}
+                className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center mb-6"
+              >
+                <X size={40} className="text-white" />
+              </motion.div>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="text-white text-2xl font-bold"
+              >
+                Kode QR Tidak Valid
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="text-white/70 text-sm mt-2 text-center px-8"
+              >
+                {overlayError}
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="text-white/50 text-xs mt-3"
+              >
+                Silakan periksa kembali atau hubungi panitia
+              </motion.p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Camera Controls */}
+      <div className="flex items-center justify-center gap-3 mt-4">
+        <Button variant="secondary" size="sm" className="gap-2" onClick={() => { setCameraOn(true); }}>
+          <RefreshCw size={16} />
+          Ganti Kamera
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="gap-2"
+          onClick={() => { setCameraOn(!cameraOn); setScanning(false); }}
+        >
+          {cameraOn ? <CameraOff size={16} /> : <Camera size={16} />}
+          {cameraOn ? 'Matikan Kamera' : 'Nyalakan Kamera'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Manual Tab Component ─────────────────────────────
+
+function ManualTab({ onCheckinSuccess }: { onCheckinSuccess: (_name: string) => void }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGuest, setSelectedGuest] = useState<import('@/types').Guest | null>(null);
+  const [paxCount, setPaxCount] = useState(1);
+  const [showWalkIn, setShowWalkIn] = useState(false);
+  const [walkInForm, setWalkInForm] = useState({ fullName: '', phone: '', category: 'friend' as string, pax: 1 });
+  const [checkedIn, setCheckedIn] = useState(false);
+  const [walkInCheckedIn, setWalkInCheckedIn] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  const { guests, isLoading: guestsLoading } = useGuests();
+  const { checkin, walkIn } = useCheckin();
+
+  const filteredGuests = searchQuery.length >= 2
+    ? guests.filter(g =>
+        g.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (g.phone && g.phone.includes(searchQuery))
+      )
+    : [];
+
+  const handleCheckIn = async () => {
+    if (!selectedGuest) return;
+    setIsSubmitting(true);
+    setSubmitError('');
+    try {
+      await checkin(selectedGuest.id, 'manual', `Check-in manual, pax: ${paxCount}`);
+      setCheckedIn(true);
+      onCheckinSuccess(selectedGuest.fullName);
+      setTimeout(() => {
+        setCheckedIn(false);
+        setSelectedGuest(null);
+        setSearchQuery('');
+        setPaxCount(1);
+      }, 2000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal melakukan check-in';
+      setSubmitError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleWalkIn = async () => {
+    if (!walkInForm.fullName) return;
+    setIsSubmitting(true);
+    setSubmitError('');
+    try {
+      await walkIn({ fullName: walkInForm.fullName, phone: walkInForm.phone || undefined });
+      setWalkInCheckedIn(true);
+      onCheckinSuccess(`Walk-in: ${walkInForm.fullName}`);
+      setTimeout(() => {
+        setWalkInCheckedIn(false);
+        setWalkInForm({ fullName: '', phone: '', category: 'friend', pax: 1 });
+        setShowWalkIn(false);
+      }, 2000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal mendaftarkan walk-in';
+      setSubmitError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Error Banner */}
+      {submitError && (
+        <div className="p-3 rounded-lg bg-[#ffe4e6] text-[#e11d48] text-sm flex items-center gap-2">
+          <AlertCircle size={16} />
+          {submitError}
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]" />
+        <Input
+          placeholder="Cari nama tamu, nomor telepon, atau email..."
+          value={searchQuery}
+          onChange={(e) => { setSearchQuery(e.target.value); setSelectedGuest(null); }}
+          className="pl-10 h-12 text-base border-[#e2e8f0] focus:border-[#4f46e5] focus:ring-[#4f46e5]/20"
+        />
+        {guestsLoading && (
+          <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-[#94a3b8]" />
+        )}
+      </div>
+
+      {/* Search Results */}
+      {filteredGuests.length > 0 && !selectedGuest && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="border border-[#e2e8f0] rounded-xl overflow-hidden bg-white dark:bg-[#151c2c] divide-y divide-[#f1f5f9]"
+        >
+          {filteredGuests.map((guest) => (
+            <button
+              key={guest.id}
+              onClick={() => setSelectedGuest(guest)}
+              className="w-full flex items-center justify-between p-4 hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#eef2ff] dark:bg-[rgba(79,70,229,0.1)] flex items-center justify-center">
+                  <Users size={18} className="text-[#4f46e5]" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm text-[#0f172a] dark:text-[#f8fafc]">{guest.fullName}</p>
+                  <p className="text-xs text-[#64748b]">{guest.phone || '-'} &middot; {guest.email || '-'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {getCategoryBadge(guest.category)}
+                <ChevronRight size={16} className="text-[#94a3b8]" />
+              </div>
+            </button>
+          ))}
+        </motion.div>
+      )}
+
+      {/* Check-in Form */}
+      <AnimatePresence>
+        {selectedGuest && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            className="bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl p-6"
+          >
+            {checkedIn ? (
+              <div className="text-center py-6">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  className="w-16 h-16 rounded-full bg-[#10b981] flex items-center justify-center mx-auto mb-4"
+                >
+                  <Check size={32} className="text-white" />
+                </motion.div>
+                <p className="text-lg font-semibold text-[#0f172a] dark:text-[#f8fafc]">Check-in Berhasil!</p>
+                <p className="text-sm text-[#64748b] mt-1">{selectedGuest.fullName}</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-full bg-[#eef2ff] dark:bg-[rgba(79,70,229,0.1)] flex items-center justify-center">
+                    <Users size={18} className="text-[#4f46e5]" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[#0f172a] dark:text-[#f8fafc]">{selectedGuest.fullName}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {getCategoryBadge(selectedGuest.category)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <label className="text-xs font-medium text-[#64748b] mb-1.5 block">Telepon</label>
+                    <div className="flex items-center gap-2 text-sm text-[#0f172a] dark:text-[#f8fafc]">
+                      <Phone size={14} className="text-[#94a3b8]" />
+                      {selectedGuest.phone || '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-[#64748b] mb-1.5 block">Email</label>
+                    <div className="flex items-center gap-2 text-sm text-[#0f172a] dark:text-[#f8fafc]">
+                      <Mail size={14} className="text-[#94a3b8]" />
+                      {selectedGuest.email || '-'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <label className="text-xs font-medium text-[#64748b] mb-1.5 block">Jumlah Tamu (Pax)</label>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 w-9 p-0"
+                      onClick={() => setPaxCount(Math.max(1, paxCount - 1))}
+                    >
+                      -
+                    </Button>
+                    <span className="text-lg font-semibold w-8 text-center">{paxCount}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 w-9 p-0"
+                      onClick={() => setPaxCount(paxCount + 1)}
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button variant="outline" className="flex-1" onClick={() => setSelectedGuest(null)}>
+                    Batal
+                  </Button>
+                  <Button className="flex-1 bg-[#4f46e5] hover:bg-[#6366f1] gap-2" onClick={handleCheckIn} disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                    Check-in
+                  </Button>
+                </div>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Walk-in Registration */}
+      <div className="border border-[#e2e8f0] dark:border-[#334155] rounded-xl overflow-hidden">
+        <button
+          onClick={() => setShowWalkIn(!showWalkIn)}
+          className="w-full flex items-center justify-between p-4 hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#fef3c7] flex items-center justify-center">
+              <UserPlus size={16} className="text-[#d97706]" />
+            </div>
+            <span className="font-medium text-sm text-[#0f172a] dark:text-[#f8fafc]">Daftar Walk-in Baru</span>
+          </div>
+          <ChevronRight
+            size={16}
+            className={cn('text-[#94a3b8] transition-transform', showWalkIn && 'rotate-90')}
+          />
+        </button>
+
+        <AnimatePresence>
+          {showWalkIn && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: easeOutExpo }}
+              className="overflow-hidden"
+            >
+              <div className="p-4 pt-0 border-t border-[#f1f5f9] dark:border-[#334155]">
+                {walkInCheckedIn ? (
+                  <div className="text-center py-6">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      className="w-16 h-16 rounded-full bg-[#10b981] flex items-center justify-center mx-auto mb-4"
+                    >
+                      <Check size={32} className="text-white" />
+                    </motion.div>
+                    <p className="text-lg font-semibold text-[#0f172a] dark:text-[#f8fafc]">Walk-in Berhasil!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 pt-4">
+                    <div>
+                      <label className="text-xs font-medium text-[#64748b] mb-1.5 block">Nama Lengkap <span className="text-[#f43f5e]">*</span></label>
+                      <Input
+                        placeholder="Nama lengkap tamu"
+                        value={walkInForm.fullName}
+                        onChange={(e) => setWalkInForm({ ...walkInForm, fullName: e.target.value })}
+                        className="border-[#e2e8f0] focus:border-[#4f46e5]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-[#64748b] mb-1.5 block">Nomor Telepon</label>
+                      <Input
+                        placeholder="08xx-xxxx-xxxx"
+                        value={walkInForm.phone}
+                        onChange={(e) => setWalkInForm({ ...walkInForm, phone: e.target.value })}
+                        className="border-[#e2e8f0] focus:border-[#4f46e5]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-[#64748b] mb-1.5 block">Tipe Tamu</label>
+                      <select
+                        value={walkInForm.category}
+                        onChange={(e) => setWalkInForm({ ...walkInForm, category: e.target.value })}
+                        className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white dark:bg-[#151c2c] text-sm text-[#0f172a] dark:text-[#f8fafc] focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20 outline-none"
+                      >
+                        <option value="vip">VIP</option>
+                        <option value="family">Keluarga</option>
+                        <option value="friend">Teman</option>
+                        <option value="colleague">Rekan</option>
+                        <option value="other">Lainnya</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-[#64748b] mb-1.5 block">Jumlah Tamu <span className="text-[#f43f5e]">*</span></label>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-9 w-9 p-0"
+                          onClick={() => setWalkInForm({ ...walkInForm, pax: Math.max(1, walkInForm.pax - 1) })}
+                        >
+                          -
+                        </Button>
+                        <span className="text-lg font-semibold w-8 text-center">{walkInForm.pax}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-9 w-9 p-0"
+                          onClick={() => setWalkInForm({ ...walkInForm, pax: walkInForm.pax + 1 })}
+                        >
+                          +
+                        </Button>
+                      </div>
+                    </div>
+                    <Button
+                      className="w-full bg-[#f59e0b] hover:bg-[#d97706] gap-2"
+                      onClick={handleWalkIn}
+                      disabled={!walkInForm.fullName || isSubmitting}
+                    >
+                      {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+                      Check-in Walk-in
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+// ── Recent Tab Component ─────────────────────────────
+
+function RecentTab({ checkins, isLoading }: { checkins: import('@/types').Checkin[]; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 p-4 bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl">
+            <Skeleton className="w-10 h-10 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (checkins.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <Clock size={48} className="text-[#e2e8f0] mx-auto mb-4" />
+        <p className="text-[#94a3b8] text-sm">Belum ada check-in hari ini</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {checkins.map((item, index) => (
+        <motion.div
+          key={item.id}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: index * 0.03, duration: 0.3, ease: easeOutExpo }}
+          className="flex items-center gap-4 p-4 bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl hover:shadow-sm transition-shadow"
+        >
+          {getStatusIcon(item.checkinMethod === 'walk_in' ? 'walk_in' : 'success')}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm text-[#0f172a] dark:text-[#f8fafc] truncate">
+              {item.checkinMethod === 'walk_in' ? `Walk-in: ${item.notes || 'Tamu'}` : item.guestId}
+            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-[#64748b] font-mono">
+                {new Date(item.checkedInAt).toLocaleTimeString('id-ID', { hour12: false })}
+              </span>
+              <span className="text-[#e2e8f0]">|</span>
+              <span className="text-xs text-[#94a3b8]">
+                {item.checkinMethod === 'qr' ? 'Scan QR' : item.checkinMethod === 'manual' ? 'Manual' : 'Walk-in'}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Badge variant="outline" className="text-[10px] border-[#e2e8f0]">
+              {item.checkedInBy}
+            </Badge>
+            {item.seatAssignment && (
+              <Badge className="bg-[#d1fae5] text-[#059669] border-[#a7f3d0] text-[10px]">
+                {item.seatAssignment}
+              </Badge>
+            )}
+            <span className="text-xs text-[#94a3b8] ml-1">{formatTimeAgo(item.checkedInAt)}</span>
+          </div>
+        </motion.div>
+      ))}
+      <p className="text-center text-xs text-[#94a3b8] pt-2">
+        Menampilkan {checkins.length} check-in terbaru
+      </p>
+    </div>
+  );
+}
+
+// ── Main Check-in Page ───────────────────────────────
+
+export default function Checkin() {
+  const [activeTab, setActiveTab] = useState('scanner');
+  const [autoRefresh, setAutoRefresh] = useState(true);
+
+  const { checkins, stats, isLoading, error, refetch } = useCheckin();
+
+  const handleCheckinSuccess = useCallback((_name: string) => {
+    // Trigger a refetch after a short delay to get updated data
+    setTimeout(() => {
+      refetch();
+    }, 500);
+  }, [refetch]);
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <AlertCircle size={48} className="text-[#f43f5e] mb-4" />
+        <p className="text-[#0f172a] dark:text-[#f8fafc] font-medium mb-2">Gagal memuat data check-in</p>
+        <p className="text-sm text-[#64748b] mb-4">{error}</p>
+        <Button onClick={refetch} variant="outline" className="gap-2">
+          <RefreshCw size={16} />
+          Coba Lagi
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: easeOutExpo }}
+    >
+      {/* Page Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold text-[#0f172a] dark:text-[#f8fafc]">Check-in Tamu</h1>
+          <p className="text-sm text-[#64748b] mt-1">Pindai QR code atau cari tamu secara manual</p>
+        </div>
+
+        {/* Live Stats */}
+        <div className="flex items-center gap-4 lg:gap-6 bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl px-4 py-3">
+          {isLoading ? (
+            <>
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-5 w-24" />
+              <Skeleton className="h-5 w-20" />
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10b981] opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#10b981]" />
+                </span>
+                <span className="text-sm text-[#0f172a] dark:text-[#f8fafc]">
+                  Check-in Hari Ini: <strong className="font-mono">{stats.totalToday}</strong>
+                </span>
+              </div>
+              <div className="text-sm text-[#0f172a] dark:text-[#f8fafc]">
+                Total Hadir: <strong className="font-mono">{stats.total}</strong>
+              </div>
+              <div className="text-sm text-[#64748b]">
+                Sisa: <strong className="font-mono">{Math.max(0, stats.total - stats.totalToday)}</strong>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] p-1 h-11">
+          <TabsTrigger
+            value="scanner"
+            className="gap-2 data-[state=active]:bg-[#eef2ff] data-[state=active]:text-[#4f46e5] rounded-lg px-4"
+          >
+            <ScanLine size={16} />
+            Scanner
+          </TabsTrigger>
+          <TabsTrigger
+            value="manual"
+            className="gap-2 data-[state=active]:bg-[#eef2ff] data-[state=active]:text-[#4f46e5] rounded-lg px-4"
+          >
+            <Keyboard size={16} />
+            Manual
+          </TabsTrigger>
+          <TabsTrigger
+            value="recent"
+            className="gap-2 data-[state=active]:bg-[#eef2ff] data-[state=active]:text-[#4f46e5] rounded-lg px-4"
+          >
+            <Clock size={16} />
+            Terbaru
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="scanner" className="mt-0">
+          <div className="flex flex-col xl:flex-row gap-6">
+            {/* Scanner Area - 60% */}
+            <div className="xl:w-[60%]">
+              <ScannerTab onCheckinSuccess={handleCheckinSuccess} />
+            </div>
+
+            {/* Recent Sidebar - 40% */}
+            <div className="xl:w-[40%]">
+              <div className="bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between p-4 border-b border-[#f1f5f9] dark:border-[#334155]">
+                  <h3 className="font-semibold text-[#0f172a] dark:text-[#f8fafc]">Check-in Terbaru</h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[#94a3b8]">Auto-refresh</span>
+                    <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+                  </div>
+                </div>
+                <div className="p-3 max-h-[560px] overflow-y-auto space-y-2">
+                  {isLoading ? (
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg">
+                        <Skeleton className="w-8 h-8 rounded-full" />
+                        <div className="flex-1 space-y-1.5">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    checkins.slice(0, 8).map((item, index) => (
+                      <motion.div
+                        key={item.id}
+                        initial={index === 0 ? { opacity: 0, y: -12 } : false}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, ease: easeOutExpo }}
+                        className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors"
+                      >
+                        <div className={cn(
+                          'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
+                          item.checkinMethod === 'walk_in' ? 'bg-[#f59e0b]' : 'bg-[#10b981]'
+                        )}>
+                          {item.checkinMethod === 'walk_in' ? <UserPlus size={14} className="text-white" /> : <Check size={14} className="text-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-[#0f172a] dark:text-[#f8fafc] truncate">
+                            {item.checkinMethod === 'walk_in' ? `Walk-in: ${item.notes || 'Tamu'}` : item.guestId}
+                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] text-[#94a3b8] font-mono">
+                              {new Date(item.checkedInAt).toLocaleTimeString('id-ID', { hour12: false })}
+                            </span>
+                            <span className="text-[11px] text-[#94a3b8]">
+                              {item.checkinMethod === 'qr' ? 'Scan QR' : item.checkinMethod === 'manual' ? 'Manual' : 'Walk-in'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {item.seatAssignment && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#d1fae5] text-[#059669]">{item.seatAssignment}</span>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="manual" className="mt-0">
+          <div className="max-w-2xl">
+            <ManualTab onCheckinSuccess={handleCheckinSuccess} />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="recent" className="mt-0">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              {!isLoading && <RefreshCw size={14} className={cn(autoRefresh && "animate-spin text-[#10b981]")} />}
+              <span className="text-sm text-[#64748b]">
+                {isLoading ? 'Memuat data...' : autoRefresh ? 'Data terbaru' : 'Auto-refresh dimatikan'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#94a3b8]">Auto-refresh</span>
+              <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+            </div>
+          </div>
+          <RecentTab checkins={checkins} isLoading={isLoading} />
+        </TabsContent>
+      </Tabs>
+    </motion.div>
+  );
+}

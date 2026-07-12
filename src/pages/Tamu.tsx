@@ -1,0 +1,764 @@
+import { useState, useMemo, useRef, type ChangeEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Eye,
+  MoreVertical,
+  Upload,
+  Download,
+  X,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Users,
+  Filter,
+  Loader2,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useGuests } from '@/hooks/useGuests';
+import type { Guest } from '@/types';
+
+const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
+
+/* ─── Config ─── */
+const typeConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
+  vvip: { label: 'VVIP', bg: 'bg-[#fef3c7]', text: 'text-[#b45309]', border: 'border-[#fcd34d]' },
+  vip: { label: 'VIP', bg: 'bg-[#eef2ff]', text: 'text-[#4f46e5]', border: 'border-[#c7d2fe]' },
+  umum: { label: 'Umum', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]' },
+  keluarga: { label: 'Keluarga', bg: 'bg-[#ffe4e6]', text: 'text-[#e11d48]', border: 'border-[#fecdd3]' },
+  family: { label: 'Keluarga', bg: 'bg-[#ffe4e6]', text: 'text-[#e11d48]', border: 'border-[#fecdd3]' },
+  friend: { label: 'Teman', bg: 'bg-[#d1fae5]', text: 'text-[#059669]', border: 'border-[#a7f3d0]' },
+  colleague: { label: 'Rekan', bg: 'bg-[#dbeafe]', text: 'text-[#2563eb]', border: 'border-[#93c5fd]' },
+  partner: { label: 'Mitra', bg: 'bg-[#fef3c7]', text: 'text-[#b45309]', border: 'border-[#fcd34d]' },
+  other: { label: 'Lainnya', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]' },
+};
+
+const rsvpConfig: Record<string, { label: string; bg: string; text: string; border: string; dot: string }> = {
+  'attending': { label: 'Hadir', bg: 'bg-[#d1fae5]', text: 'text-[#059669]', border: 'border-[#a7f3d0]', dot: '#10b981' },
+  'not_attending': { label: 'Tidak Hadir', bg: 'bg-[#ffe4e6]', text: 'text-[#e11d48]', border: 'border-[#fecdd3]', dot: '#f43f5e' },
+  'maybe': { label: 'Mungkin', bg: 'bg-[#fef3c7]', text: 'text-[#b45309]', border: 'border-[#fcd34d]', dot: '#f59e0b' },
+  'no_response': { label: 'Belum Membalas', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]', dot: '#94a3b8' },
+  'hadir': { label: 'Hadir', bg: 'bg-[#d1fae5]', text: 'text-[#059669]', border: 'border-[#a7f3d0]', dot: '#10b981' },
+  'tidak-hadir': { label: 'Tidak Hadir', bg: 'bg-[#ffe4e6]', text: 'text-[#e11d48]', border: 'border-[#fecdd3]', dot: '#f43f5e' },
+  'belum': { label: 'Belum Membalas', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]', dot: '#94a3b8' },
+};
+
+/* ─── Helpers ─── */
+function mapCategoryToType(category: Guest['category']): string {
+  const map: Record<string, string> = {
+    vip: 'vip',
+    family: 'keluarga',
+    friend: 'vip',
+    colleague: 'umum',
+    partner: 'vvip',
+    other: 'umum',
+  };
+  return map[category] || category;
+}
+
+function getTypeConfig(guest: Guest) {
+  return typeConfig[mapCategoryToType(guest.category)] || typeConfig.umum;
+}
+
+function getRsvpLabel(_guest: Guest) {
+  // RSVP is separate in the API; show as "Belum Membalas" until fetched
+  return rsvpConfig['no_response'];
+}
+
+/* ─── Skeleton Row ─── */
+function SkeletonRow() {
+  return (
+    <tr className="border-b border-[#f1f5f9] dark:border-[#334155] animate-pulse">
+      <td className="px-4 py-3"><div className="w-4 h-4 rounded bg-[#e2e8f0] dark:bg-[#334155]" /></td>
+      <td className="px-4 py-3"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-[#e2e8f0] dark:bg-[#334155]" /><div className="flex-1"><div className="h-3 w-24 bg-[#e2e8f0] dark:bg-[#334155] rounded mb-1" /><div className="h-2 w-32 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></div></div></td>
+      <td className="px-4 py-3"><div className="h-3 w-24 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
+      <td className="px-4 py-3"><div className="h-3 w-14 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
+      <td className="px-4 py-3"><div className="h-3 w-20 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
+      <td className="px-4 py-3"><div className="h-3 w-16 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
+      <td className="px-4 py-3"><div className="h-3 w-12 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
+      <td className="px-4 py-3"><div className="h-3 w-8 bg-[#e2e8f0] dark:bg-[#334155] rounded ml-auto" /></td>
+    </tr>
+  );
+}
+
+/* ─── Component ─── */
+export default function Tamu() {
+  const navigate = useNavigate();
+  const { guests, total, isLoading, error, createGuest, updateGuest, deleteGuest, importCSV } = useGuests();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [segmentFilter, setSegmentFilter] = useState<string>('all');
+  const [rsvpFilter, setRsvpFilter] = useState<string>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /* Pagination */
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+
+  /* Modals */
+  const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
+  const [deletingGuest, setDeletingGuest] = useState<Guest | null>(null);
+
+  /* Add form */
+  const [formName, setFormName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+  const [formType, setFormType] = useState<Guest['category']>('other');
+  const [formSegment, setFormSegment] = useState('');
+  const [_formRsvp, setFormRsvp] = useState('no_response');
+
+  /* ─── Segments from data ─── */
+  const segments = useMemo(() => {
+    const set = new Set(guests.map((g) => g.subgroup).filter(Boolean));
+    return Array.from(set) as string[];
+  }, [guests]);
+
+  /* ─── Filtered guests (client-side) ─── */
+  const filtered = useMemo(() => {
+    let data = [...guests];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      data = data.filter((g) =>
+        g.fullName.toLowerCase().includes(q) ||
+        (g.email?.toLowerCase() ?? '').includes(q) ||
+        (g.phone ?? '').includes(q)
+      );
+    }
+    if (typeFilter !== 'all') data = data.filter((g) => mapCategoryToType(g.category) === typeFilter);
+    if (segmentFilter !== 'all') data = data.filter((g) => g.subgroup === segmentFilter);
+    // RSVP filter is client-side since we don't have RSVP data embedded
+    if (rsvpFilter !== 'all') {
+      // Placeholder: would filter by actual RSVP status
+      data = data;
+    }
+    return data;
+  }, [guests, searchQuery, typeFilter, segmentFilter, rsvpFilter]);
+
+  /* ─── Paginated ─── */
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const safePage = Math.min(page, totalPages);
+  const paginated = useMemo(() => {
+    const start = (safePage - 1) * perPage;
+    return filtered.slice(start, start + perPage);
+  }, [filtered, safePage, perPage]);
+
+  /* ─── Selection ─── */
+  const allSelected = paginated.length > 0 && paginated.every((g) => selectedIds.has(g.id));
+  const toggleAll = () => {
+    if (allSelected) {
+      const next = new Set(selectedIds);
+      paginated.forEach((g) => next.delete(g.id));
+      setSelectedIds(next);
+    } else {
+      const next = new Set(selectedIds);
+      paginated.forEach((g) => next.add(g.id));
+      setSelectedIds(next);
+    }
+  };
+  const toggleOne = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  /* ─── Handlers ─── */
+  const openAdd = () => {
+    setFormName(''); setFormEmail(''); setFormPhone(''); setFormType('other'); setFormSegment(''); setFormRsvp('no_response');
+    setShowAdd(true);
+  };
+
+  const openEdit = (g: Guest) => {
+    setEditingGuest(g);
+    setFormName(g.fullName); setFormEmail(g.email ?? ''); setFormPhone(g.phone ?? ''); setFormType(g.category); setFormSegment(g.subgroup ?? '');
+    setShowEdit(true);
+    setDropdownOpen(null);
+  };
+
+  const openDelete = (g: Guest) => {
+    setDeletingGuest(g);
+    setShowDelete(true);
+    setDropdownOpen(null);
+  };
+
+  const handleAdd = async () => {
+    setSubmitting(true);
+    setErrorToast(null);
+    try {
+      await createGuest({
+        fullName: formName,
+        email: formEmail || undefined,
+        phone: formPhone || undefined,
+        category: formType,
+        subgroup: formSegment || undefined,
+        eventId: '', // Will be set by backend based on tenant
+      });
+      setShowAdd(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal menambah tamu';
+      setErrorToast(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!editingGuest) return;
+    setSubmitting(true);
+    setErrorToast(null);
+    try {
+      await updateGuest(editingGuest.id, {
+        fullName: formName,
+        email: formEmail || undefined,
+        phone: formPhone || undefined,
+        category: formType,
+        subgroup: formSegment || undefined,
+      });
+      setShowEdit(false);
+      setEditingGuest(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal memperbarui tamu';
+      setErrorToast(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingGuest) return;
+    setSubmitting(true);
+    setErrorToast(null);
+    try {
+      await deleteGuest(deletingGuest.id);
+      setShowDelete(false);
+      setDeletingGuest(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal menghapus tamu';
+      setErrorToast(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setSubmitting(true);
+    setErrorToast(null);
+    try {
+      const ids = Array.from(selectedIds);
+      await Promise.all(ids.map((id) => deleteGuest(id)));
+      setSelectedIds(new Set());
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal menghapus tamu';
+      setErrorToast(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setTypeFilter('all');
+    setSegmentFilter('all');
+    setRsvpFilter('all');
+    setPage(1);
+  };
+
+  const handleFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setErrorToast(null);
+    try {
+      await importCSV(file);
+      setShowImport(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal mengimpor CSV';
+      setErrorToast(msg);
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  /* ─── Shared form ─── */
+  const GuestForm = (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-xs font-medium text-[#64748b] mb-1">Nama Lengkap <span className="text-[#f43f5e]">*</span></label>
+        <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="Nama lengkap..."
+          className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20" />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-[#64748b] mb-1">Email</label>
+          <input type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} placeholder="email@contoh.com"
+            className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[#64748b] mb-1">Nomor Telepon <span className="text-[#f43f5e]">*</span></label>
+          <input type="tel" value={formPhone} onChange={(e) => setFormPhone(e.target.value)} placeholder="08xx-xxxx-xxxx"
+            className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-[#64748b] mb-1">Tipe Tamu <span className="text-[#f43f5e]">*</span></label>
+          <select value={formType} onChange={(e) => setFormType(e.target.value as Guest['category'])}
+            className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20">
+            <option value="vip">VIP</option>
+            <option value="family">Keluarga</option>
+            <option value="friend">Teman</option>
+            <option value="colleague">Rekan Kerja</option>
+            <option value="partner">Mitra</option>
+            <option value="other">Umum</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[#64748b] mb-1">Segmen</label>
+          <input type="text" value={formSegment} onChange={(e) => setFormSegment(e.target.value)} placeholder="Nama segmen..."
+            className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20" />
+        </div>
+      </div>
+    </div>
+  );
+
+  const hasFilters = searchQuery || typeFilter !== 'all' || segmentFilter !== 'all' || rsvpFilter !== 'all';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: easeOutExpo }}
+      className="space-y-6"
+    >
+      {/* Error Toast */}
+      <AnimatePresence>
+        {(errorToast || error) && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="px-4 py-3 rounded-lg bg-[#fff1f2] dark:bg-[rgba(244,63,94,0.1)] border border-[#f43f5e]/20 text-sm text-[#f43f5e] flex items-center justify-between"
+          >
+            <span>{errorToast || error}</span>
+            <button onClick={() => setErrorToast(null)} className="text-[#f43f5e] hover:text-[#e11d48]">
+              <X size={16} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Page Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-[#0f172a] dark:text-[#f8fafc]">Daftar Tamu</h1>
+          <p className="text-sm text-[#64748b] mt-0.5">{total.toLocaleString('id-ID')} tamu terdaftar</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={openAdd}
+            disabled={isLoading}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[#4f46e5] text-white text-sm font-medium hover:bg-[#6366f1] hover:scale-[1.02] active:scale-[0.96] transition-all disabled:opacity-50">
+            <Plus size={16} />
+            Tambah Tamu
+          </button>
+          <button onClick={() => setShowImport(true)}
+            disabled={isLoading}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors disabled:opacity-50">
+            <Upload size={15} />
+            Impor CSV
+          </button>
+          <button className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors">
+            <Download size={15} />
+            Ekspor
+          </button>
+          {selectedIds.size > 0 && (
+            <button onClick={handleBulkDelete} disabled={submitting}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[#f43f5e] text-white text-sm font-medium hover:bg-[#e11d48] transition-colors disabled:opacity-50">
+              <Trash2 size={15} />
+              Hapus ({selectedIds.size})
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Filter Bar ── */}
+      <div className="space-y-3 bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]" />
+            <input type="text" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+              placeholder="Cari nama, email, atau telepon..."
+              className="w-[320px] h-10 pl-9 pr-4 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20" />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#64748b]">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <div className="relative">
+            <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+              className="h-10 pl-3 pr-8 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] appearance-none cursor-pointer">
+              <option value="all">Semua Tipe</option>
+              <option value="vip">VIP</option>
+              <option value="keluarga">Keluarga</option>
+              <option value="vvip">VVIP</option>
+              <option value="umum">Umum</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94a3b8] pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select value={segmentFilter} onChange={(e) => { setSegmentFilter(e.target.value); setPage(1); }}
+              className="h-10 pl-3 pr-8 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] appearance-none cursor-pointer">
+              <option value="all">Semua Segmen</option>
+              {segments.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94a3b8] pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select value={rsvpFilter} onChange={(e) => { setRsvpFilter(e.target.value); setPage(1); }}
+              className="h-10 pl-3 pr-8 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] appearance-none cursor-pointer">
+              <option value="all">Semua RSVP</option>
+              <option value="attending">Hadir</option>
+              <option value="not_attending">Tidak Hadir</option>
+              <option value="maybe">Mungkin</option>
+              <option value="no_response">Belum Membalas</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94a3b8] pointer-events-none" />
+          </div>
+          {hasFilters && (
+            <button onClick={clearFilters}
+              className="inline-flex items-center gap-1 h-9 px-3 text-sm text-[#f43f5e] hover:bg-[#ffe4e6]/50 rounded-lg transition-colors">
+              <Filter size={14} />
+              Hapus Filter
+            </button>
+          )}
+          <div className="ml-auto text-xs text-[#64748b]">
+            Menampilkan {filtered.length > 0 ? ((safePage - 1) * perPage) + 1 : 0}-{Math.min(safePage * perPage, filtered.length)} dari {filtered.length} tamu
+          </div>
+        </div>
+      </div>
+
+      {/* ── Guests Table ── */}
+      <div className="bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-[#f8fafc] dark:bg-[#1e293b] border-b border-[#e2e8f0] dark:border-[#334155]">
+                <th className="px-4 py-3 w-10">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll}
+                    className="w-4 h-4 rounded border-[#e2e8f0] text-[#4f46e5] focus:ring-[#4f46e5]/20" />
+                </th>
+                <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Nama</th>
+                <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Telepon</th>
+                <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Tipe</th>
+                <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Segmen</th>
+                <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">RSVP</th>
+                <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Meja</th>
+                <th className="text-right px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <>
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                </>
+              ) : (
+                <>
+                  <AnimatePresence>
+                    {paginated.map((g, i) => {
+                      const t = getTypeConfig(g);
+                      const r = getRsvpLabel(g);
+                      return (
+                        <motion.tr key={g.id}
+                          initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.15, delay: i * 0.02, ease: easeOutExpo }}
+                          className={cn(
+                            'border-b border-[#f1f5f9] dark:border-[#334155] hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors group',
+                            selectedIds.has(g.id) && 'bg-[#eef2ff] dark:bg-[rgba(79,70,229,0.1)]'
+                          )}>
+                          <td className="px-4 py-3">
+                            <input type="checkbox" checked={selectedIds.has(g.id)} onChange={() => toggleOne(g.id)}
+                              className="w-4 h-4 rounded border-[#e2e8f0] text-[#4f46e5] focus:ring-[#4f46e5]/20" />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#4f46e5] to-[#6366f1] flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                                {g.fullName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-[#0f172a] dark:text-[#f8fafc]">{g.fullName}</p>
+                                <p className="text-xs text-[#94a3b8]">{g.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-[#64748b] font-mono">{g.phone || '-'}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border', t.bg, t.text, t.border)}>
+                              {t.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-[#64748b]">{g.subgroup || '-'}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={cn('inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border', r.bg, r.text, r.border)}>
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: r.dot }} />
+                              {r.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-[#64748b]">-</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => openEdit(g)}
+                                className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors" title="Ubah">
+                                <Pencil size={15} />
+                              </button>
+                              <button onClick={() => navigate(`/tamu/${g.id}`)}
+                                className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors" title="Lihat Detail">
+                                <Eye size={15} />
+                              </button>
+                              <div className="relative">
+                                <button onClick={() => setDropdownOpen(dropdownOpen === g.id ? null : g.id)}
+                                  className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors" title="Lainnya">
+                                  <MoreVertical size={15} />
+                                </button>
+                                <AnimatePresence>
+                                  {dropdownOpen === g.id && (
+                                    <>
+                                      <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(null)} />
+                                      <motion.div initial={{ opacity: 0, scale: 0.95, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                                        transition={{ duration: 0.15, ease: easeOutExpo }}
+                                        className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-lg shadow-lg z-20 py-1">
+                                        <button onClick={() => { navigate(`/tamu/${g.id}`); }}
+                                          className="w-full text-left px-3 py-2 text-sm text-[#64748b] hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors">Lihat Detail</button>
+                                        <button onClick={() => openEdit(g)}
+                                          className="w-full text-left px-3 py-2 text-sm text-[#64748b] hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors">Ubah Tamu</button>
+                                        <div className="border-t border-[#e2e8f0] dark:border-[#334155] my-1" />
+                                        <button onClick={() => openDelete(g)}
+                                          className="w-full text-left px-3 py-2 text-sm text-[#f43f5e] hover:bg-[#ffe4e6]/50 transition-colors">Hapus</button>
+                                      </motion.div>
+                                    </>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                  </AnimatePresence>
+                  {paginated.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="text-center py-12">
+                        <Users size={40} className="mx-auto text-[#e2e8f0] mb-3" />
+                        <p className="text-sm text-[#64748b]">Tidak ada tamu yang cocok</p>
+                        <p className="text-xs text-[#94a3b8] mt-1">Coba ubah filter atau kata kunci pencarian</p>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── Pagination ── */}
+        {!isLoading && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-[#e2e8f0] dark:border-[#334155]">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#64748b]">Baris per halaman</span>
+              <select value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}
+                className="h-8 px-2 rounded-md border border-[#e2e8f0] bg-white text-xs focus:outline-none focus:border-[#4f46e5]">
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1}
+                className="p-1.5 rounded-md border border-[#e2e8f0] hover:bg-[#f1f5f9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                <ChevronLeft size={16} />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <button key={p} onClick={() => setPage(p)}
+                  className={cn(
+                    'min-w-[32px] h-8 px-2 rounded-md text-xs font-medium transition-colors',
+                    p === safePage ? 'bg-[#4f46e5] text-white' : 'border border-[#e2e8f0] hover:bg-[#f1f5f9] text-[#64748b]'
+                  )}>
+                  {p}
+                </button>
+              ))}
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}
+                className="p-1.5 rounded-md border border-[#e2e8f0] hover:bg-[#f1f5f9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            <span className="text-xs text-[#64748b]">Halaman {safePage} dari {totalPages}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Add Modal ── */}
+      <AnimatePresence>
+        {showAdd && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => !submitting && setShowAdd(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.25, ease: easeOutExpo }}
+              className="relative w-full max-w-[560px] bg-white dark:bg-[#151c2c] rounded-2xl shadow-[0_24px_48px_rgba(15,23,42,0.12)] border border-[#e2e8f0] dark:border-[#334155] z-10 overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[#e2e8f0] dark:border-[#334155]">
+                <h2 className="text-lg font-semibold text-[#0f172a] dark:text-[#f8fafc]">Tambah Tamu</h2>
+                <button onClick={() => !submitting && setShowAdd(false)} className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#94a3b8]"><X size={18} /></button>
+              </div>
+              <div className="px-6 py-5 max-h-[60vh] overflow-y-auto">{GuestForm}</div>
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#e2e8f0] dark:border-[#334155]">
+                <button onClick={() => setShowAdd(false)} disabled={submitting}
+                  className="h-10 px-4 rounded-lg text-sm font-medium text-[#64748b] hover:bg-[#f1f5f9] transition-colors disabled:opacity-50">Batal</button>
+                <button onClick={handleAdd} disabled={!formName || !formPhone || submitting}
+                  className={cn('h-10 px-6 rounded-lg text-sm font-medium transition-all flex items-center gap-2',
+                    !formName || !formPhone || submitting ? 'bg-[#e2e8f0] text-[#94a3b8] cursor-not-allowed' : 'bg-[#4f46e5] text-white hover:bg-[#6366f1] hover:scale-[1.02] active:scale-[0.96]')}>
+                  {submitting && <Loader2 size={16} className="animate-spin" />}
+                  Simpan Tamu
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Edit Modal ── */}
+      <AnimatePresence>
+        {showEdit && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => !submitting && setShowEdit(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.25, ease: easeOutExpo }}
+              className="relative w-full max-w-[560px] bg-white dark:bg-[#151c2c] rounded-2xl shadow-[0_24px_48px_rgba(15,23,42,0.12)] border border-[#e2e8f0] dark:border-[#334155] z-10 overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[#e2e8f0] dark:border-[#334155]">
+                <h2 className="text-lg font-semibold text-[#0f172a] dark:text-[#f8fafc]">Ubah Tamu</h2>
+                <button onClick={() => !submitting && setShowEdit(false)} className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#94a3b8]"><X size={18} /></button>
+              </div>
+              <div className="px-6 py-5 max-h-[60vh] overflow-y-auto">{GuestForm}</div>
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#e2e8f0] dark:border-[#334155]">
+                <button onClick={() => setShowEdit(false)} disabled={submitting}
+                  className="h-10 px-4 rounded-lg text-sm font-medium text-[#64748b] hover:bg-[#f1f5f9] transition-colors disabled:opacity-50">Batal</button>
+                <button onClick={handleEdit} disabled={submitting}
+                  className="h-10 px-6 rounded-lg text-sm font-medium bg-[#4f46e5] text-white hover:bg-[#6366f1] hover:scale-[1.02] active:scale-[0.96] transition-all flex items-center gap-2">
+                  {submitting && <Loader2 size={16} className="animate-spin" />}
+                  Simpan Perubahan
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Delete Modal ── */}
+      <AnimatePresence>
+        {showDelete && deletingGuest && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => !submitting && setShowDelete(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2, ease: easeOutExpo }}
+              className="relative w-full max-w-md bg-white dark:bg-[#151c2c] rounded-2xl shadow-[0_24px_48px_rgba(15,23,42,0.12)] border border-[#e2e8f0] dark:border-[#334155] z-10 p-6">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-[#ffe4e6] flex items-center justify-center">
+                  <Trash2 size={18} className="text-[#f43f5e]" />
+                </div>
+                <h2 className="text-lg font-semibold text-[#0f172a] dark:text-[#f8fafc]">Hapus Tamu</h2>
+              </div>
+              <p className="text-sm text-[#64748b] mb-6">
+                Apakah Anda yakin ingin menghapus tamu <strong className="text-[#0f172a] dark:text-[#f8fafc]">&ldquo;{deletingGuest.fullName}&rdquo;</strong>?
+                Tindakan ini tidak dapat dibatalkan.
+              </p>
+              <div className="flex items-center justify-end gap-3">
+                <button onClick={() => setShowDelete(false)} disabled={submitting}
+                  className="h-10 px-4 rounded-lg text-sm font-medium text-[#64748b] hover:bg-[#f1f5f9] transition-colors disabled:opacity-50">Batal</button>
+                <button onClick={handleDelete} disabled={submitting}
+                  className="h-10 px-6 rounded-lg text-sm font-medium bg-[#f43f5e] text-white hover:bg-[#e11d48] hover:scale-[1.02] active:scale-[0.96] transition-all flex items-center gap-2">
+                  {submitting && <Loader2 size={16} className="animate-spin" />}
+                  Hapus Tamu
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── CSV Import Modal ── */}
+      <AnimatePresence>
+        {showImport && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => !importing && setShowImport(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.25, ease: easeOutExpo }}
+              className="relative w-full max-w-[480px] bg-white dark:bg-[#151c2c] rounded-2xl shadow-[0_24px_48px_rgba(15,23,42,0.12)] border border-[#e2e8f0] dark:border-[#334155] z-10 overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[#e2e8f0] dark:border-[#334155]">
+                <h2 className="text-lg font-semibold text-[#0f172a] dark:text-[#f8fafc]">Impor Tamu dari CSV</h2>
+                <button onClick={() => !importing && setShowImport(false)} className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#94a3b8]"><X size={18} /></button>
+              </div>
+              <div className="px-6 py-6">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-[#e2e8f0] rounded-xl h-40 flex flex-col items-center justify-center gap-2 hover:border-[#4f46e5] hover:bg-[#eef2ff]/50 transition-colors cursor-pointer"
+                >
+                  {importing ? (
+                    <>
+                      <Loader2 size={40} className="text-[#4f46e5] animate-spin" />
+                      <p className="text-sm text-[#64748b]">Mengimpor...</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={40} className="text-[#94a3b8]" />
+                      <p className="text-sm text-[#64748b]">Klik untuk pilih file CSV</p>
+                      <p className="text-xs text-[#94a3b8]">Maks 5MB. Format: nama, email, telepon, tipe, segmen</p>
+                    </>
+                  )}
+                </div>
+                <button className="mt-4 text-sm text-[#4f46e5] hover:underline font-medium">
+                  Unduh template CSV
+                </button>
+              </div>
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#e2e8f0] dark:border-[#334155]">
+                <button onClick={() => setShowImport(false)} disabled={importing}
+                  className="h-10 px-4 rounded-lg text-sm font-medium text-[#64748b] hover:bg-[#f1f5f9] transition-colors disabled:opacity-50">Batal</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}

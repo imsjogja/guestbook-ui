@@ -1,0 +1,60 @@
+import { create } from 'zustand';
+import type { User } from '@/types';
+
+interface AuthState {
+  accessToken: string | null;
+  user: User | null;
+  isLoading: boolean;
+  error: string | null;
+
+  login: (token: string, user: User) => void;
+  logout: () => void;
+  setUser: (user: User | null) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+  isAuthenticated: () => boolean;
+}
+
+export const useAuthStore = create<AuthState>((set, get) => ({
+  accessToken: typeof window !== 'undefined' ? localStorage.getItem('gf_access_token') : null,
+  user: (() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('gf_user');
+      return raw ? JSON.parse(raw) as User : null;
+    } catch {
+      return null;
+    }
+  })(),
+  isLoading: false,
+  error: null,
+
+  login: (token: string, user: User) => {
+    localStorage.setItem('gf_access_token', token);
+    localStorage.setItem('gf_user', JSON.stringify(user));
+    set({ accessToken: token, user, error: null });
+  },
+
+  logout: () => {
+    localStorage.removeItem('gf_access_token');
+    localStorage.removeItem('gf_user');
+    set({ accessToken: null, user: null, error: null });
+  },
+
+  setUser: (user: User | null) => {
+    if (user) {
+      localStorage.setItem('gf_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('gf_user');
+    }
+    set({ user });
+  },
+
+  setLoading: (loading: boolean) => set({ isLoading: loading }),
+  setError: (error: string | null) => set({ error }),
+
+  isAuthenticated: () => {
+    const state = get();
+    return !!state.accessToken && !!state.user;
+  },
+}));
