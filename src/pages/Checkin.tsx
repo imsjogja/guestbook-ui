@@ -321,7 +321,7 @@ function ManualTab({ onCheckinSuccess }: { onCheckinSuccess: (_name: string) => 
     setIsSubmitting(true);
     setSubmitError('');
     try {
-      await checkin(selectedGuest.id, 'manual', `Check-in manual, pax: ${paxCount}`);
+      await checkin(selectedGuest.id, 'manual', `Check-in manual, pax: ${paxCount}`, paxCount);
       setCheckedIn(true);
       onCheckinSuccess(selectedGuest.fullName);
       setTimeout(() => {
@@ -343,7 +343,14 @@ function ManualTab({ onCheckinSuccess }: { onCheckinSuccess: (_name: string) => 
     setIsSubmitting(true);
     setSubmitError('');
     try {
-      await walkIn({ fullName: walkInForm.fullName, phone: walkInForm.phone || undefined });
+      await walkIn({
+        fullName: walkInForm.fullName,
+        phone: walkInForm.phone || undefined,
+        guestType: walkInForm.category,
+        actualPax: walkInForm.pax,
+        adults: walkInForm.pax,
+        children: 0,
+      });
       setWalkInCheckedIn(true);
       onCheckinSuccess(`Walk-in: ${walkInForm.fullName}`);
       setTimeout(() => {

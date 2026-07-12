@@ -8,6 +8,77 @@ interface CheckinStats {
   byMethod: { qr: number; manual: number; walkIn: number };
 }
 
+interface ApiCheckin {
+  id: string;
+  guest_id: string;
+  event_id: string;
+  method?: string;
+  created_at?: string;
+  createdAt?: string;
+  officer_id?: string | null;
+  notes?: string | null;
+  seat_assignment?: string | null;
+  seatAssignment?: string | null;
+}
+
+interface ApiMethodStat {
+  method?: string;
+  count?: number;
+}
+
+interface ApiCheckinStats {
+  total_expected?: number;
+  total_checked_in?: number;
+  recent_checkins?: ApiCheckin[];
+  by_method?: ApiMethodStat[];
+}
+
+function normalizeCheckinMethod(method?: string): Checkin['checkinMethod'] {
+  switch (method) {
+    case 'qr_scan':
+    case 'qr':
+      return 'qr';
+    case 'walk_in':
+      return 'walk_in';
+    case 'manual_search':
+    case 'manual':
+    case 'kiosk':
+    default:
+      return 'manual';
+  }
+}
+
+function normalizeCheckin(item: ApiCheckin): Checkin {
+  return {
+    id: item.id,
+    guestId: item.guest_id,
+    eventId: item.event_id,
+    checkinMethod: normalizeCheckinMethod(item.method),
+    checkedInBy: item.officer_id ?? 'System',
+    checkedInAt: item.created_at ?? item.createdAt ?? new Date().toISOString(),
+    notes: item.notes ?? undefined,
+    seatAssignment: item.seat_assignment ?? item.seatAssignment ?? undefined,
+  };
+}
+
+function normalizeStats(data?: ApiCheckinStats): CheckinStats {
+  const byMethodBase = { qr: 0, manual: 0, walkIn: 0 };
+  const byMethod = (data?.by_method ?? []).reduce((acc, item) => {
+    const method = normalizeCheckinMethod(item.method);
+    const count = item.count ?? 0;
+    if (method === 'qr') acc.qr += count;
+    else if (method === 'walk_in') acc.walkIn += count;
+    else acc.manual += count;
+    return acc;
+  }, byMethodBase);
+
+  return {
+    totalToday: data?.total_checked_in ?? 0,
+    total: data?.total_expected ?? 0,
+    byMethod,
+  };
+}
+
 export function useCheckin(eventId?: string) {
   const [checkins, setCheckins] = useState<Checkin[]>([]);
   const [stats, setStats] = useState<CheckinStats>({
@@ -23,12 +94,26 @@ export function useCheckin(eventId?: string) {
     setError(null);
     try {
       const params = eventId ? { eventId } : {};
-      const [checkinsRes, statsRes] = await Promise.all([
-        api.get<{ data: Checkin[] }>('/checkins', { params }),
-        api.get<{ data: CheckinStats }>('/checkins/stats', { params }),
+      const [checkinsRes, statsRes] = await Promise.allSettled([
+        api.get<{ data: ApiCheckin[] }>('/checkins', { params }),
+        api.get<{ data: ApiCheckinStats }>('/checkins/stats', { params }),
       ]);
-      setCheckins(checkinsRes.data.data ?? []);
-      setStats(statsRes.data.data ?? { totalToday: 0, total: 0, byMethod: { qr: 0, manual: 0, walkIn: 0 } });
+
+      if (checkinsRes.status === 'fulfilled') {
+        setCheckins((checkinsRes.value.data.data ?? []).map(normalizeCheckin));
+      } else {
+        setCheckins([]);
+      }
+
+      if (statsRes.status === 'fulfilled') {
+        setStats(normalizeStats(statsRes.value.data.data));
+      } else {
+        setStats({ totalToday: 0, total: 0, byMethod: { qr: 0, manual: 0, walkIn: 0 } });
+      }
+
+      if (checkinsRes.status === 'rejected' && statsRes.status === 'rejected') {
+        throw checkinsRes.reason;
+      }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       const msg = axiosErr.response?.data?.message ?? 'Gagal memuat check-in';
@@ -43,15 +128,24 @@ export function useCheckin(eventId?: string) {
   }, [fetchCheckins]);
 
   const checkin = useCallback(
-    async (guestId: string, method: 'qr' | 'manual' = 'manual', notes?: string) => {
+    async (
+      guestId: string,
+      method: 'qr' | 'manual' = 'manual',
+      notes?: string,
+      actualPax = 1
+    ) => {
       try {
+        const backendMethod = method === 'qr' ? 'qr_scan' : 'manual_search';
         const response = await api.post<{ data: Checkin }>('/checkins', {
-          guestId,
-          eventId,
-          checkinMethod: method,
+          method: backendMethod,
+          guest_id: guestId,
+          event_id: eventId,
+          actual_pax: actualPax,
+          adults: actualPax,
+          children: 0,
           notes,
         });
-        const newCheckin = response.data.data;
+        const newCheckin = normalizeCheckin(response.data.data as unknown as ApiCheckin);
         setCheckins((prev) => [newCheckin, ...prev]);
         return newCheckin;
       } catch (err: unknown) {
@@ -63,13 +157,28 @@ export function useCheckin(eventId?: string) {
   );
 
   const walkIn = useCallback(
-    async (data: { fullName: string; phone?: string; eventId?: string }) => {
+    async (data: {
+      fullName: string;
+      phone?: string;
+      guestType?: string;
+      actualPax?: number;
+      adults?: number;
+      children?: number;
+      notes?: string;
+      eventId?: string;
+    }) => {
       try {
         const response = await api.post<{ data: Checkin }>('/checkins/walk-in', {
-          ...data,
-          eventId: data.eventId ?? eventId,
+          full_name: data.fullName,
+          phone: data.phone,
+          guest_type: data.guestType ?? 'friend',
+          actual_pax: data.actualPax ?? 1,
+          adults: data.adults ?? data.actualPax ?? 1,
+          children: data.children ?? 0,
+          notes: data.notes,
+          event_id: data.eventId ?? eventId,
         });
-        const newCheckin = response.data.data;
+        const newCheckin = normalizeCheckin(response.data.data as unknown as ApiCheckin);
         setCheckins((prev) => [newCheckin, ...prev]);
         return newCheckin;
       } catch (err: unknown) {
