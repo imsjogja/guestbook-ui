@@ -71,7 +71,7 @@ export interface Event {
   endDate?: string;
   location: string;
   address?: string;
-  status: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled';
+  status: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled' | 'archived';
   capacity?: number;
   coverImage?: string;
   createdAt: string;

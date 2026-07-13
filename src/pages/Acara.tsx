@@ -88,7 +88,7 @@ export default function Acara() {
     let data = [...events];
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      data = data.filter((e) => e.name.toLowerCase().includes(q) || e.location.toLowerCase().includes(q));
+      data = data.filter((e) => e.name.toLowerCase().includes(q) || (e.location ?? '').toLowerCase().includes(q));
     }
     if (statusFilter !== 'all') {
       data = data.filter((e) => e.status === statusFilter);
@@ -446,7 +446,7 @@ export default function Acara() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1.5 text-sm text-[#64748b]">
                               <MapPin size={13} className="flex-shrink-0" />
-                              <span className="truncate max-w-[180px]">{evt.location}</span>
+                              <span className="truncate max-w-[180px]">{evt.location || '-'}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3">

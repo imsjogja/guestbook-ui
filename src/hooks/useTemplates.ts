@@ -1,6 +1,31 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { Template, ApiResponse } from '@/types';
+import { normalizeTemplate, type BackendTemplate } from '@/lib/normalizers';
+
+type TemplatePayload = {
+  name?: string;
+  channel?: 'whatsapp' | 'email' | 'sms';
+  type?: string;
+  subject?: string;
+  body?: string;
+  variables?: string[];
+  description?: string;
+  language?: string;
+  is_active?: boolean;
+};
+
+function toTemplatePayload(data: Partial<Template>): TemplatePayload {
+  const payload: TemplatePayload = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.channel !== undefined) payload.channel = data.channel === 'both' ? 'whatsapp' : data.channel;
+  if (data.category !== undefined) payload.type = data.category;
+  if (data.subject !== undefined) payload.subject = data.subject;
+  if (data.body !== undefined) payload.body = data.body;
+  if (data.variables !== undefined) payload.variables = data.variables;
+  if (data.isActive !== undefined) payload.is_active = data.isActive;
+  return payload;
+}
 
 export interface UseTemplatesReturn {
   templates: Template[];
@@ -21,8 +46,8 @@ export function useTemplates(): UseTemplatesReturn {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await api.get<ApiResponse<Template[]>>('/templates');
-      setTemplates(res.data.data || []);
+      const res = await api.get<ApiResponse<BackendTemplate[]>>('/templates');
+      setTemplates((res.data.data || []).map(normalizeTemplate));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal memuat template';
       setError(msg);
@@ -37,8 +62,8 @@ export function useTemplates(): UseTemplatesReturn {
 
   const createTemplate = useCallback(async (data: Partial<Template>): Promise<Template | null> => {
     try {
-      const res = await api.post<ApiResponse<Template>>('/templates', data);
-      const newTemplate = res.data.data;
+      const res = await api.post<ApiResponse<BackendTemplate>>('/templates', toTemplatePayload(data));
+      const newTemplate = normalizeTemplate(res.data.data);
       setTemplates((prev) => [newTemplate, ...prev]);
       return newTemplate;
     } catch (err: unknown) {
@@ -50,8 +75,8 @@ export function useTemplates(): UseTemplatesReturn {
 
   const updateTemplate = useCallback(async (id: string, data: Partial<Template>): Promise<Template | null> => {
     try {
-      const res = await api.patch<ApiResponse<Template>>(`/templates/${id}`, data);
-      const updated = res.data.data;
+      const res = await api.patch<ApiResponse<BackendTemplate>>(`/templates/${id}`, toTemplatePayload(data));
+      const updated = normalizeTemplate(res.data.data);
       setTemplates((prev) => prev.map((t) => (t.id === id ? updated : t)));
       return updated;
     } catch (err: unknown) {

@@ -133,6 +133,10 @@ function getEventStatusBadge(status: string) {
       return { label: 'Aktif', className: 'bg-[#d1fae5] text-[#10b981] border-[#a7f3d0]' };
     case 'draft':
       return { label: 'Draft', className: 'bg-[#fef3c7] text-[#f59e0b] border-[#fde68a]' };
+    case 'paused':
+      return { label: 'Dijeda', className: 'bg-[#fef3c7] text-[#b45309] border-[#fcd34d]' };
+    case 'archived':
+      return { label: 'Diarsipkan', className: 'bg-[#f1f5f9] text-[#64748b] border-[#e2e8f0]' };
     default:
       return { label: status, className: 'bg-[#f1f5f9] text-[#64748b] border-[#e2e8f0]' };
   }
@@ -305,7 +309,7 @@ export default function Dashboard() {
 
   // Upcoming events from real data
   const upcomingEvents = eventsData
-    .filter((e) => e.status === 'active' || e.status === 'draft')
+    .filter((e) => e.status === 'active' || e.status === 'draft' || e.status === 'paused')
     .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
     .slice(0, 5)
     .map((e) => ({
@@ -695,7 +699,7 @@ export default function Dashboard() {
                           {event.name}
                         </p>
                         <p className="text-[11px] text-[#94a3b8]">
-                          {event.location}
+                          {event.location || '-'}
                         </p>
                       </div>
                       <span className={cn('px-2 py-0.5 text-[10px] font-semibold rounded-full border flex-shrink-0', badge.className)}>
