@@ -92,8 +92,9 @@ function useCountUp(target: number, duration = 800, delay = 0) {
   return count;
 }
 
-function formatCount(n: number) {
-  return n.toLocaleString('id-ID');
+function formatCount(n: number | null | undefined) {
+  const safe = typeof n === 'number' && Number.isFinite(n) ? n : 0;
+  return safe.toLocaleString('id-ID');
 }
 
 function getRelativeTime(dateStr: string) {
@@ -455,7 +456,7 @@ export default function Dashboard() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number) => [`${value.toLocaleString('id-ID')} tamu`, '']}
+                      formatter={(value) => [`${formatCount(typeof value === 'number' ? value : Number(value ?? 0))} tamu`, '']}
                       contentStyle={{
                         backgroundColor: 'white',
                         border: '1px solid #e2e8f0',
@@ -468,8 +469,8 @@ export default function Dashboard() {
                 </ResponsiveContainer>
                 {/* Center text */}
                 <div className="relative -mt-[110px] sm:-mt-[130px] flex flex-col items-center justify-center pointer-events-none">
-                  <p className="text-xl sm:text-2xl font-bold text-[#0f172a] dark:text-[#f8fafc] font-mono">
-                    {totalRsvp.toLocaleString('id-ID')}
+                <p className="text-xl sm:text-2xl font-bold text-[#0f172a] dark:text-[#f8fafc] font-mono">
+                    {formatCount(totalRsvp)}
                   </p>
                   <p className="text-[10px] text-[#94a3b8]">Total Tamu</p>
                 </div>
@@ -490,7 +491,7 @@ export default function Dashboard() {
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className="text-xs font-semibold text-[#0f172a] dark:text-[#f8fafc]">
-                          {item.value.toLocaleString('id-ID')}
+                          {formatCount(item.value)}
                         </p>
                         <p className="text-[10px] text-[#94a3b8]">{pct}%</p>
                       </div>
