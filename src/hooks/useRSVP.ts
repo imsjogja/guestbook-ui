@@ -35,6 +35,22 @@ function asCount(value: number | undefined | null): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
+function resolveGuestCount(status: RSVP['status'] | undefined, guestCount?: number): number {
+  if (typeof guestCount === 'number' && Number.isFinite(guestCount)) {
+    return Math.max(0, guestCount);
+  }
+
+  switch (status) {
+    case 'not_attending':
+      return 0;
+    case 'maybe':
+    case 'attending':
+    case 'no_response':
+    default:
+      return 1;
+  }
+}
+
 function normalizeRSVP(item: ApiRSVP): RSVP {
   return {
     id: item.id,
@@ -73,19 +89,12 @@ function normalizeBreakdown(data?: ApiRSVPBreakdown): RSVPBreakdown {
 
 function toBackendRSVPUpdate(data: Partial<RSVP>): Record<string, unknown> {
   const status = data.status;
-  const guestCount =
-    data.guestCount !== undefined
-      ? data.guestCount
-      : status === 'attending'
-        ? 1
-        : status === 'not_attending'
-          ? 0
-          : undefined;
+  const guestCount = resolveGuestCount(status, data.guestCount);
 
   return {
     ...(status ? { status } : {}),
-    ...(guestCount !== undefined ? { attending_pax: guestCount } : {}),
-    ...(data.guestCount !== undefined ? { adults: Math.max(0, data.guestCount) } : {}),
+    attending_pax: guestCount,
+    adults: guestCount,
     ...(data.message !== undefined ? { notes: data.message } : {}),
   };
 }

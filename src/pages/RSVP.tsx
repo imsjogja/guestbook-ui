@@ -71,11 +71,10 @@ const statusConfig: Record<
   },
 };
 
-const statusOptions: { value: RSVPStatus; label: string }[] = [
+const editableStatusOptions: { value: RSVPStatus; label: string }[] = [
   { value: 'attending', label: 'Hadir' },
   { value: 'not_attending', label: 'Tidak Hadir' },
   { value: 'maybe', label: 'Tentatif' },
-  { value: 'no_response', label: 'Belum Membalas' },
 ];
 
 /* ── Chart Colors ──────────────────────────────────── */
@@ -142,13 +141,10 @@ export default function RSVPPage() {
 
   /* ── Handlers ───────────────────────────────────── */
 
-  const handleStatusChange = async (id: string, newStatus: RSVPStatus) => {
-    await updateRSVP(id, {
+  const handleStatusChange = async (rsvp: import('@/types').RSVP, newStatus: RSVPStatus) => {
+    await updateRSVP(rsvp.id, {
       status: newStatus,
-      respondedAt:
-        newStatus === 'no_response'
-          ? undefined
-          : new Date().toISOString(),
+      guestCount: newStatus === 'not_attending' ? 0 : Math.max(1, rsvp.guestCount || 1),
     });
     setEditingId(null);
   };
@@ -474,15 +470,15 @@ export default function RSVPPage() {
                       <td className="px-4 py-3">
                         {editingId === r.id ? (
                           <Select
-                            defaultValue={r.status}
-                            onValueChange={(val) => handleStatusChange(r.id, val as RSVPStatus)}
+                            value={r.status === 'no_response' ? 'maybe' : r.status}
+                            onValueChange={(val) => handleStatusChange(r, val as RSVPStatus)}
                             open
                           >
                             <SelectTrigger className="h-8 w-[140px] text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {statusOptions.map((opt) => (
+                              {editableStatusOptions.map((opt) => (
                                 <SelectItem key={opt.value} value={opt.value} className="text-xs">
                                   {opt.label}
                                 </SelectItem>
@@ -698,14 +694,14 @@ export default function RSVPPage() {
                     </p>
                   </div>
                   <Select
-                    defaultValue={r.status}
-                    onValueChange={(val) => handleStatusChange(r.id, val as RSVPStatus)}
+                    value={r.status === 'no_response' ? 'maybe' : r.status}
+                    onValueChange={(val) => handleStatusChange(r, val as RSVPStatus)}
                   >
                     <SelectTrigger className="h-8 w-[130px] text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {statusOptions.map((opt) => (
+                      {editableStatusOptions.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value} className="text-xs">
                           {opt.label}
                         </SelectItem>

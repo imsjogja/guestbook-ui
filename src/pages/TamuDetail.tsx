@@ -42,6 +42,8 @@ interface RSVPDetail {
   message?: string;
 }
 
+type EditableRSVPStatus = 'attending' | 'not_attending' | 'maybe';
+
 interface CheckinRecord {
   eventId?: string;
   checkedInAt: string;
@@ -99,7 +101,7 @@ export default function TamuDetail() {
   const { invitations, createInvitation } = useInvitations(currentEventId);
   const { rsvps, updateRSVP } = useRSVP(currentEventId);
   const [showRsvpEdit, setShowRsvpEdit] = useState(false);
-  const [selectedRsvpStatus, setSelectedRsvpStatus] = useState<RSVPDetail['status']>('attending');
+  const [selectedRsvpStatus, setSelectedRsvpStatus] = useState<EditableRSVPStatus>('attending');
   const [isSavingRsvp, setIsSavingRsvp] = useState(false);
   const [isCreatingInvitation, setIsCreatingInvitation] = useState(false);
 
@@ -118,7 +120,7 @@ export default function TamuDetail() {
   const invitationLabel = invitation ? `Tamu ${guest?.fullName ?? ''}` : 'Belum ada undangan';
 
   const openRsvpEdit = () => {
-    setSelectedRsvpStatus(rsvp?.status ?? 'attending');
+    setSelectedRsvpStatus(rsvp?.status === 'not_attending' || rsvp?.status === 'maybe' ? rsvp.status : 'attending');
     setShowRsvpEdit(true);
   };
 
@@ -714,13 +716,12 @@ export default function TamuDetail() {
                 <label className="block text-xs font-medium text-[#64748b] mb-1">Status</label>
                 <select
                   value={selectedRsvpStatus}
-                  onChange={(e) => setSelectedRsvpStatus(e.target.value as RSVPDetail['status'])}
+                  onChange={(e) => setSelectedRsvpStatus(e.target.value as EditableRSVPStatus)}
                   className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5]"
                 >
                   <option value="attending">Hadir</option>
                   <option value="not_attending">Tidak Hadir</option>
                   <option value="maybe">Tentatif</option>
-                  <option value="no_response">Belum Membalas</option>
                 </select>
               </div>
               <p className="text-xs text-[#94a3b8]">
