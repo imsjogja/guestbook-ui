@@ -34,9 +34,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useRSVP } from '@/hooks';
+import { useTenantStore } from '@/store/tenantStore';
 import type { RSVPStatus } from '@/types';
+import { buildRSVPExportCsv, downloadTextFile } from '@/lib/rsvp-csv';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -87,7 +90,8 @@ const CHART_COLORS = {
 /* ── Main Component ───────────────────────────────── */
 
 export default function RSVPPage() {
-  const { rsvps, breakdown, isLoading, error, refetch, updateRSVP } = useRSVP();
+  const currentEventId = useTenantStore((s) => s.currentEvent?.id);
+  const { rsvps, breakdown, isLoading, error, refetch, updateRSVP } = useRSVP(currentEventId);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -95,6 +99,7 @@ export default function RSVPPage() {
   const [reminderChannel, setReminderChannel] = useState('whatsapp');
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   /* ── Filtering ──────────────────────────────────── */
 
@@ -102,6 +107,7 @@ export default function RSVPPage() {
     return rsvps.filter((r) => {
       const matchesSearch =
         !search ||
+        (r.guestName?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
         r.guestId.toLowerCase().includes(search.toLowerCase()) ||
         (r.message && r.message.toLowerCase().includes(search.toLowerCase()));
       const matchesStatus =
@@ -150,14 +156,23 @@ export default function RSVPPage() {
   const sendReminder = async () => {
     setSendingReminder(true);
     try {
-      // Send reminder to all guests with no_response status
-      const noResponseRsvps = rsvps.filter((r) => r.status === 'no_response');
-      for (const r of noResponseRsvps) {
-        await updateRSVP(r.id, { status: 'no_response' }); // Trigger reminder via API
-      }
+      toast.info('Pengiriman pengingat RSVP belum terhubung ke backend');
     } finally {
       setSendingReminder(false);
       setReminderModalOpen(false);
+    }
+  };
+
+  const exportRsvpCsv = async () => {
+    setExporting(true);
+    try {
+      const csv = buildRSVPExportCsv(filtered);
+      downloadTextFile(`rsvp_export_${new Date().toISOString().slice(0, 10)}.csv`, csv, 'text/csv;charset=utf-8');
+      toast.success(`Berhasil mengekspor ${filtered.length} data RSVP`);
+    } catch {
+      toast.error('Gagal mengekspor data RSVP');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -228,8 +243,8 @@ export default function RSVPPage() {
             <Bell size={16} />
             <span className="hidden sm:inline">Kirim Pengingat</span>
           </Button>
-          <Button variant="outline" size="sm">
-            <Download size={16} />
+          <Button variant="outline" size="sm" onClick={exportRsvpCsv} disabled={exporting}>
+            {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             <span className="hidden sm:inline">Ekspor Data</span>
           </Button>
         </div>
@@ -452,7 +467,7 @@ export default function RSVPPage() {
                     >
                       <td className="px-4 py-3">
                         <div className="font-medium text-[#1e293b] dark:text-[#f8fafc]">
-                          Tamu {r.guestId.slice(0, 8)}
+                          {r.guestName || `Tamu ${r.guestId.slice(0, 8)}`}
                         </div>
                         <div className="text-xs text-[#94a3b8] mt-0.5">{r.guestId}</div>
                       </td>
@@ -673,7 +688,7 @@ export default function RSVPPage() {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc] truncate">
-                      Tamu {r.guestId.slice(0, 8)}
+                      {r.guestName || `Tamu ${r.guestId.slice(0, 8)}`}
                     </p>
                     <p className="text-xs text-[#94a3b8]">
                       Saat ini:{' '}

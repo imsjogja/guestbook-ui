@@ -15,6 +15,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getGuestFirstName, getGuestInitials } from '@/lib/normalizers';
 import { useGuests } from '@/hooks';
 import type { Guest } from '@/types';
 
@@ -104,7 +105,7 @@ export default function KelompokKeluarga() {
         const firstMember = members[0];
         result.push({
           id: hhId,
-          name: firstMember.subgroup || `Keluarga ${firstMember.fullName.split(' ')[0]}`,
+          name: firstMember.subgroup || `Keluarga ${getGuestFirstName(firstMember.fullName)}`,
           eventName: formEvent,
           members: members.map(mapGuestToMember),
         });
@@ -500,7 +501,7 @@ export default function KelompokKeluarga() {
 /* ─── Helper: Map Guest to HouseholdMember ─── */
 function mapGuestToMember(g: Guest): HouseholdMember {
   const name = g.fullName;
-  const initials = name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+  const initials = getGuestInitials(name);
   // Map category to a member type label
   const typeMap: Record<string, string> = {
     vip: 'VIP',

@@ -19,21 +19,20 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getGuestInitials } from '@/lib/normalizers';
 import { useGuests } from '@/hooks/useGuests';
 import type { Guest } from '@/types';
+import { toast } from 'sonner';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 /* ─── Config ─── */
-const typeConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  vvip: { label: 'VVIP', bg: 'bg-[#fef3c7]', text: 'text-[#b45309]', border: 'border-[#fcd34d]' },
+const typeConfig: Record<Guest['category'], { label: string; bg: string; text: string; border: string }> = {
   vip: { label: 'VIP', bg: 'bg-[#eef2ff]', text: 'text-[#4f46e5]', border: 'border-[#c7d2fe]' },
-  umum: { label: 'Umum', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]' },
-  keluarga: { label: 'Keluarga', bg: 'bg-[#ffe4e6]', text: 'text-[#e11d48]', border: 'border-[#fecdd3]' },
   family: { label: 'Keluarga', bg: 'bg-[#ffe4e6]', text: 'text-[#e11d48]', border: 'border-[#fecdd3]' },
   friend: { label: 'Teman', bg: 'bg-[#d1fae5]', text: 'text-[#059669]', border: 'border-[#a7f3d0]' },
   colleague: { label: 'Rekan', bg: 'bg-[#dbeafe]', text: 'text-[#2563eb]', border: 'border-[#93c5fd]' },
-  partner: { label: 'Mitra', bg: 'bg-[#fef3c7]', text: 'text-[#b45309]', border: 'border-[#fcd34d]' },
+  partner: { label: 'VVIP', bg: 'bg-[#fef3c7]', text: 'text-[#b45309]', border: 'border-[#fcd34d]' },
   other: { label: 'Lainnya', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]' },
 };
 
@@ -47,21 +46,8 @@ const rsvpConfig: Record<string, { label: string; bg: string; text: string; bord
   'belum': { label: 'Belum Membalas', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]', dot: '#94a3b8' },
 };
 
-/* ─── Helpers ─── */
-function mapCategoryToType(category: Guest['category']): string {
-  const map: Record<string, string> = {
-    vip: 'vip',
-    family: 'keluarga',
-    friend: 'vip',
-    colleague: 'umum',
-    partner: 'vvip',
-    other: 'umum',
-  };
-  return map[category] || category;
-}
-
 function getTypeConfig(guest: Guest) {
-  return typeConfig[mapCategoryToType(guest.category)] || typeConfig.umum;
+  return typeConfig[guest.category] || typeConfig.other;
 }
 
 function getRsvpLabel(_guest: Guest) {
@@ -88,7 +74,18 @@ function SkeletonRow() {
 /* ─── Component ─── */
 export default function Tamu() {
   const navigate = useNavigate();
-  const { guests, total, isLoading, error, createGuest, updateGuest, deleteGuest, importCSV } = useGuests();
+  const {
+    guests,
+    total,
+    isLoading,
+    error,
+    createGuest,
+    updateGuest,
+    deleteGuest,
+    importCSV,
+    downloadTemplateCSV,
+    exportGuestsCSV,
+  } = useGuests();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [segmentFilter, setSegmentFilter] = useState<string>('all');
@@ -98,6 +95,8 @@ export default function Tamu() {
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [templateDownloading, setTemplateDownloading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* Pagination */
@@ -137,7 +136,7 @@ export default function Tamu() {
         (g.phone ?? '').includes(q)
       );
     }
-    if (typeFilter !== 'all') data = data.filter((g) => mapCategoryToType(g.category) === typeFilter);
+    if (typeFilter !== 'all') data = data.filter((g) => g.category === typeFilter);
     if (segmentFilter !== 'all') data = data.filter((g) => g.subgroup === segmentFilter);
     // RSVP filter is client-side since we don't have RSVP data embedded
     if (rsvpFilter !== 'all') {
@@ -293,6 +292,34 @@ export default function Tamu() {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    setTemplateDownloading(true);
+    setErrorToast(null);
+    try {
+      await downloadTemplateCSV();
+      toast.success('Template CSV berhasil diunduh');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal mengunduh template CSV';
+      setErrorToast(msg);
+    } finally {
+      setTemplateDownloading(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    setErrorToast(null);
+    try {
+      const exportedCount = await exportGuestsCSV();
+      toast.success(`Berhasil mengekspor ${exportedCount} tamu`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal mengekspor CSV';
+      setErrorToast(msg);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   /* ─── Shared form ─── */
   const GuestForm = (
     <div className="space-y-4">
@@ -380,9 +407,13 @@ export default function Tamu() {
             <Upload size={15} />
             Impor CSV
           </button>
-          <button className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors">
-            <Download size={15} />
-            Ekspor
+          <button
+            onClick={handleExport}
+            disabled={isLoading || exporting}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors disabled:opacity-50"
+          >
+            {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+            {exporting ? 'Mengekspor...' : 'Ekspor'}
           </button>
           {selectedIds.size > 0 && (
             <button onClick={handleBulkDelete} disabled={submitting}
@@ -413,9 +444,11 @@ export default function Tamu() {
               className="h-10 pl-3 pr-8 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] appearance-none cursor-pointer">
               <option value="all">Semua Tipe</option>
               <option value="vip">VIP</option>
-              <option value="keluarga">Keluarga</option>
-              <option value="vvip">VVIP</option>
-              <option value="umum">Umum</option>
+              <option value="family">Keluarga</option>
+              <option value="friend">Teman</option>
+              <option value="colleague">Rekan</option>
+              <option value="partner">VVIP</option>
+              <option value="other">Lainnya</option>
             </select>
             <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94a3b8] pointer-events-none" />
           </div>
@@ -500,7 +533,7 @@ export default function Tamu() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#4f46e5] to-[#6366f1] flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-                                {g.fullName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                                {getGuestInitials(g.fullName)}
                               </div>
                               <div>
                                 <p className="text-sm font-medium text-[#0f172a] dark:text-[#f8fafc]">{g.fullName}</p>
@@ -747,8 +780,14 @@ export default function Tamu() {
                     </>
                   )}
                 </div>
-                <button className="mt-4 text-sm text-[#4f46e5] hover:underline font-medium">
-                  Unduh template CSV
+                <button
+                  type="button"
+                  onClick={handleDownloadTemplate}
+                  disabled={templateDownloading}
+                  className="mt-4 inline-flex items-center gap-2 text-sm text-[#4f46e5] hover:underline font-medium disabled:opacity-50"
+                >
+                  {templateDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  {templateDownloading ? 'Mengunduh template...' : 'Unduh template CSV'}
                 </button>
               </div>
               <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#e2e8f0] dark:border-[#334155]">

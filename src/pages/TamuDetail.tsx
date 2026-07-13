@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -12,6 +12,7 @@ import {
   Clock,
   QrCode,
   Download,
+  Loader2,
   RefreshCw,
   Send,
   ClipboardCheck,
@@ -24,7 +25,11 @@ import {
 import { format } from 'date-fns';
 import { id as idID } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { useGuestDetail } from '@/hooks';
+import { getGuestInitials } from '@/lib/normalizers';
+import { QRCodeSVG, downloadQRCodeSvg } from '@/components/QRCodeSVG';
+import { useGuestDetail, useInvitations, useRSVP } from '@/hooks';
+import { useTenantStore } from '@/store/tenantStore';
+import { toast } from 'sonner';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -35,12 +40,6 @@ interface RSVPDetail {
   respondedVia?: string;
   guestCount?: number;
   message?: string;
-}
-
-interface InvitationRecord {
-  channel: 'whatsapp' | 'email' | 'both';
-  status: string;
-  sentAt?: string | null;
 }
 
 interface CheckinRecord {
@@ -96,8 +95,76 @@ export default function TamuDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('ringkasan');
+  const currentEventId = useTenantStore((s) => s.currentEvent?.id);
+  const { invitations } = useInvitations(currentEventId);
+  const { rsvps, updateRSVP } = useRSVP(currentEventId);
+  const [showRsvpEdit, setShowRsvpEdit] = useState(false);
+  const [selectedRsvpStatus, setSelectedRsvpStatus] = useState<RSVPDetail['status']>('attending');
+  const [isSavingRsvp, setIsSavingRsvp] = useState(false);
 
   const { guest, isLoading, error } = useGuestDetail(id);
+  const invitation = useMemo(
+    () => invitations.find((inv) => inv.guestId === guest?.id) ?? null,
+    [invitations, guest?.id]
+  );
+  const rsvpRecord = useMemo(
+    () => rsvps.find((item) => item.guestId === guest?.id) ?? null,
+    [rsvps, guest?.id]
+  );
+  const rsvp = rsvpRecord as RSVPDetail | null;
+  const rsvpCfg = rsvp ? rsvpConfig[rsvp.status] || rsvpConfig['no_response'] : rsvpConfig['no_response'];
+  const invitationCode = invitation?.qrCodeUrl || invitation?.shortLink || invitation?.id || '';
+  const invitationLabel = invitation ? `Tamu ${guest?.fullName ?? ''}` : 'Belum ada undangan';
+
+  const openRsvpEdit = () => {
+    setSelectedRsvpStatus(rsvp?.status ?? 'attending');
+    setShowRsvpEdit(true);
+  };
+
+  const handleSaveRsvp = async () => {
+    if (!rsvpRecord) {
+      toast.error('RSVP belum tersedia untuk tamu ini');
+      return;
+    }
+
+    setIsSavingRsvp(true);
+    try {
+      await updateRSVP(rsvpRecord.id, {
+        status: selectedRsvpStatus,
+        guestCount: selectedRsvpStatus === 'not_attending' ? 0 : rsvpRecord.guestCount || 1,
+      });
+      toast.success('Status RSVP diperbarui');
+      setShowRsvpEdit(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal memperbarui RSVP';
+      toast.error(msg);
+    } finally {
+      setIsSavingRsvp(false);
+    }
+  };
+
+  const handleDownloadQr = () => {
+    if (!guest || !invitationCode) {
+      toast.error('QR code belum tersedia');
+      return;
+    }
+
+    downloadQRCodeSvg(invitationCode, `qr-guest-${guest.id}.svg`);
+  };
+
+  const handleCopyInvitationLink = async () => {
+    if (!invitationCode) {
+      toast.error('Link undangan belum tersedia');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(invitationCode);
+      toast.success('Link undangan disalin');
+    } catch {
+      toast.error('Gagal menyalin link undangan');
+    }
+  };
 
   /* ── Loading State ── */
   if (isLoading) {
@@ -196,17 +263,12 @@ export default function TamuDetail() {
     );
   }
 
-  /* ── Map related data ── */
-  const rsvp = guest.rsvp as RSVPDetail | undefined;
-  const rsvpCfg = rsvp ? rsvpConfig[rsvp.status] || rsvpConfig['no_response'] : rsvpConfig['no_response'];
-  const invitations = (guest.invitations || []) as InvitationRecord[];
   const checkins = (guest.checkins || []).map((ci) => ({
     eventId: (ci as unknown as Record<string, unknown>).eventId as string | undefined,
     checkedInAt: ci.checkedInAt,
     seatAssignment: ci.seatAssignment,
     checkinMethod: ci.checkinMethod,
   })) as CheckinRecord[];
-
   const typeKey = guest.category || 'other';
   const typeLabel = typeKey.charAt(0).toUpperCase() + typeKey.slice(1);
 
@@ -236,7 +298,7 @@ export default function TamuDetail() {
       <div className="bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
         <div className="flex flex-col sm:flex-row items-start gap-4">
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#4f46e5] to-[#6366f1] flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
-            {guest.fullName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+            {getGuestInitials(guest.fullName)}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -425,11 +487,17 @@ export default function TamuDetail() {
             <div className="lg:col-span-2 bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
               <h3 className="text-base font-semibold text-[#0f172a] dark:text-[#f8fafc] mb-4">Tindakan</h3>
               <div className="flex flex-wrap gap-3">
-                <button className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-[#4f46e5] text-white text-sm font-medium hover:bg-[#6366f1] hover:scale-[1.02] active:scale-[0.96] transition-all">
+                <button
+                  onClick={openRsvpEdit}
+                  className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-[#4f46e5] text-white text-sm font-medium hover:bg-[#6366f1] hover:scale-[1.02] active:scale-[0.96] transition-all"
+                >
                   <Edit3 size={15} />
                   Ubah Status RSVP
                 </button>
-                <button className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors">
+                <button
+                  onClick={() => toast.info('Pengiriman reminder belum dihubungkan ke backend')}
+                  className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors"
+                >
                   <Send size={15} />
                   Kirim Reminder
                 </button>
@@ -447,34 +515,35 @@ export default function TamuDetail() {
             {/* Invitation History */}
             <div className="bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
               <h3 className="text-base font-semibold text-[#0f172a] dark:text-[#f8fafc] mb-4">Riwayat Undangan</h3>
-              {invitations.length > 0 ? (
-                <div className="overflow-hidden rounded-lg border border-[#e2e8f0] dark:border-[#334155]">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-[#f8fafc] dark:bg-[#1e293b]">
-                        <th className="text-left px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Kanal</th>
-                        <th className="text-left px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Status</th>
-                        <th className="text-left px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Tanggal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {invitations.map((inv, i) => (
-                        <tr key={i} className="border-t border-[#f1f5f9] dark:border-[#334155]">
-                          <td className="px-4 py-3 text-sm text-[#0f172a] dark:text-[#f8fafc]">
-                            {inv.channel === 'whatsapp' ? 'WhatsApp' : inv.channel === 'email' ? 'Email' : 'Keduanya'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="inline-flex items-center gap-1 text-sm text-[#059669]">
-                              <CheckCircle2 size={14} /> {inv.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-[#64748b]">
-                            {inv.sentAt ? format(new Date(inv.sentAt), 'd MMM yyyy, HH:mm', { locale: idID }) : '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {invitation ? (
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-[#e2e8f0] dark:border-[#334155] bg-[#f8fafc] dark:bg-[#1e293b] p-4 space-y-3">
+                    <div>
+                      <p className="text-[11px] font-medium text-[#94a3b8] uppercase tracking-wider mb-1">Status</p>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[#d1fae5] text-[#059669] border border-[#a7f3d0]">
+                        <CheckCircle2 size={14} />
+                        {invitation.status}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium text-[#94a3b8] uppercase tracking-wider mb-1">Link Undangan</p>
+                      <p className="text-sm text-[#0f172a] dark:text-[#f8fafc] break-all font-mono">{invitationCode || '-'}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-[11px] font-medium text-[#94a3b8] uppercase tracking-wider mb-1">Kanal</p>
+                        <p className="text-[#0f172a] dark:text-[#f8fafc]">
+                          {invitation.channel === 'whatsapp' ? 'WhatsApp' : invitation.channel === 'email' ? 'Email' : 'Keduanya'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium text-[#94a3b8] uppercase tracking-wider mb-1">Dibuat</p>
+                        <p className="text-[#0f172a] dark:text-[#f8fafc]">
+                          {invitation.createdAt ? format(new Date(invitation.createdAt), 'd MMM yyyy, HH:mm', { locale: idID }) : '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="bg-[#f8fafc] dark:bg-[#1e293b] rounded-lg p-6 text-center border border-[#e2e8f0] dark:border-[#334155]">
@@ -488,21 +557,37 @@ export default function TamuDetail() {
             <div className="bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
               <h3 className="text-base font-semibold text-[#0f172a] dark:text-[#f8fafc] mb-4">Kode QR</h3>
               <div className="flex flex-col items-center">
-                <div className="w-[200px] h-[200px] bg-white rounded-xl border-2 border-dashed border-[#e2e8f0] flex flex-col items-center justify-center gap-3 mb-4">
-                  <QrCode size={80} className="text-[#0f172a]" />
-                  <span className="text-[10px] text-[#94a3b8] font-mono">GF-{guest.id}-2025</span>
-                </div>
-                <p className="text-xs text-[#94a3b8] mb-4">Scan untuk check-in</p>
-                <div className="flex gap-2">
-                  <button className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors">
-                    <Download size={14} />
-                    Unduh QR
-                  </button>
-                  <button className="inline-flex items-center gap-2 h-9 px-3 rounded-lg text-sm font-medium text-[#64748b] hover:bg-[#f1f5f9] transition-colors">
-                    <RefreshCw size={14} />
-                    Buat Ulang
-                  </button>
-                </div>
+                {invitationCode ? (
+                  <>
+                    <div className="w-[220px] min-h-[220px] bg-white rounded-xl border-2 border-dashed border-[#e2e8f0] flex flex-col items-center justify-center gap-3 mb-4 p-4">
+                      <QRCodeSVG code={invitationCode} size={200} />
+                      <span className="text-[10px] text-[#94a3b8] font-mono text-center break-all">{invitationLabel}</span>
+                    </div>
+                    <p className="text-xs text-[#94a3b8] mb-4">Scan untuk check-in</p>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      <button
+                        onClick={handleDownloadQr}
+                        className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors"
+                      >
+                        <Download size={14} />
+                        Unduh QR
+                      </button>
+                      <button
+                        onClick={handleCopyInvitationLink}
+                        className="inline-flex items-center gap-2 h-9 px-3 rounded-lg text-sm font-medium text-[#64748b] hover:bg-[#f1f5f9] transition-colors"
+                      >
+                        <QrCode size={14} />
+                        Salin Link
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full rounded-xl border border-dashed border-[#e2e8f0] py-12 text-center">
+                    <QrCode size={40} className="mx-auto text-[#94a3b8] mb-3" />
+                    <p className="text-sm text-[#64748b]">QR code belum tersedia</p>
+                    <p className="text-xs text-[#94a3b8] mt-1">Buat undangan terlebih dahulu untuk tamu ini.</p>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
@@ -587,6 +672,59 @@ export default function TamuDetail() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {showRsvpEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-[rgba(15,23,42,0.45)] backdrop-blur-sm"
+            onClick={() => !isSavingRsvp && setShowRsvpEdit(false)}
+          />
+          <div className="relative w-full max-w-md bg-white dark:bg-[#151c2c] rounded-2xl border border-[#e2e8f0] dark:border-[#334155] shadow-[0_24px_48px_rgba(15,23,42,0.16)] z-10 overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#e2e8f0] dark:border-[#334155]">
+              <h3 className="text-lg font-semibold text-[#0f172a] dark:text-[#f8fafc]">Ubah Status RSVP</h3>
+              <p className="text-sm text-[#64748b] mt-1">{guest.fullName}</p>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-[#64748b] mb-1">Status</label>
+                <select
+                  value={selectedRsvpStatus}
+                  onChange={(e) => setSelectedRsvpStatus(e.target.value as RSVPDetail['status'])}
+                  className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5]"
+                >
+                  <option value="attending">Hadir</option>
+                  <option value="not_attending">Tidak Hadir</option>
+                  <option value="maybe">Tentatif</option>
+                  <option value="no_response">Belum Membalas</option>
+                </select>
+              </div>
+              <p className="text-xs text-[#94a3b8]">
+                Perubahan ini akan disimpan ke data RSVP event aktif.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#e2e8f0] dark:border-[#334155]">
+              <button
+                onClick={() => setShowRsvpEdit(false)}
+                disabled={isSavingRsvp}
+                className="h-10 px-4 rounded-lg text-sm font-medium text-[#64748b] hover:bg-[#f1f5f9] transition-colors disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSaveRsvp}
+                disabled={isSavingRsvp}
+                className={cn(
+                  'h-10 px-6 rounded-lg text-sm font-medium transition-all flex items-center gap-2',
+                  isSavingRsvp ? 'bg-[#e2e8f0] text-[#94a3b8] cursor-not-allowed' : 'bg-[#4f46e5] text-white hover:bg-[#6366f1]'
+                )}
+              >
+                {isSavingRsvp && <Loader2 size={16} className="animate-spin" />}
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

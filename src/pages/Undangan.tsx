@@ -38,6 +38,9 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useInvitations } from '@/hooks';
+import { useTenantStore } from '@/store/tenantStore';
+import { QRCodeSVG } from '@/components/QRCodeSVG';
+import { toast } from 'sonner';
 
 /* ── Extended UI Type ─────────────────────────────── */
 type InvitationStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | 'revoked';
@@ -104,74 +107,11 @@ const statusConfig: Record<
   },
 };
 
-/* ── QR Code SVG Component ────────────────────────── */
-
-function QRCodeSVG({ code, size = 200 }: { code: string; size?: number }) {
-  const cells = generateQRCells(code);
-  const cellSize = Math.floor(size / cells.length);
-  const actualSize = cellSize * cells.length;
-
-  return (
-    <svg
-      width={actualSize}
-      height={actualSize}
-      viewBox={`0 0 ${actualSize} ${actualSize}`}
-      className="mx-auto"
-    >
-      {cells.map((row, y) =>
-        row.map((filled, x) =>
-          filled ? (
-            <rect
-              key={`${x}-${y}`}
-              x={x * cellSize}
-              y={y * cellSize}
-              width={cellSize}
-              height={cellSize}
-              fill="#0f172a"
-            />
-          ) : null
-        )
-      )}
-    </svg>
-  );
-}
-
-function generateQRCells(code: string): boolean[][] {
-  const size = 25;
-  const cells: boolean[][] = Array.from({ length: size }, () =>
-    Array(size).fill(false)
-  );
-  let hash = 0;
-  for (let i = 0; i < code.length; i++) {
-    hash = ((hash << 5) - hash + code.charCodeAt(i)) | 0;
-  }
-  const seed = Math.abs(hash);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const v = Math.sin(seed * 9301 + x * 49297 + y * 233) * 49297;
-      cells[y][x] = v - Math.floor(v) > 0.45;
-    }
-  }
-  // Position detection patterns (corners)
-  const drawFinder = (ox: number, oy: number) => {
-    for (let dy = 0; dy < 7; dy++) {
-      for (let dx = 0; dx < 7; dx++) {
-        const on =
-          dy === 0 || dy === 6 || dx === 0 || dx === 6 || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4);
-        if (oy + dy < size && ox + dx < size) cells[oy + dy][ox + dx] = on;
-      }
-    }
-  };
-  drawFinder(0, 0);
-  drawFinder(size - 7, 0);
-  drawFinder(0, size - 7);
-  return cells;
-}
-
 /* ── Main Component ───────────────────────────────── */
 
 export default function Undangan() {
-  const { invitations, isLoading, error, refetch, batchCreate, revokeInvitation, resendInvitation } = useInvitations();
+  const currentEventId = useTenantStore((s) => s.currentEvent?.id);
+  const { invitations, isLoading, error, refetch, batchCreate, revokeInvitation, resendInvitation } = useInvitations(currentEventId);
   const [search, setSearch] = useState('');
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -253,7 +193,10 @@ export default function Undangan() {
   };
 
   const handleResend = async (inv: UIInvitation) => {
-    await resendInvitation(inv.id);
+    const success = await resendInvitation(inv.id);
+    if (!success) {
+      toast.info('Kirim ulang undangan belum tersedia');
+    }
   };
 
   const openBatchModal = () => {
@@ -543,6 +486,7 @@ export default function Undangan() {
                           {inv.status === 'failed' && (
                             <button
                               onClick={() => handleResend(inv)}
+                              disabled
                               className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors"
                               title="Kirim Ulang"
                             >
@@ -618,7 +562,7 @@ export default function Undangan() {
               <Download size={14} />
               Unduh QR
             </Button>
-            <Button size="sm" onClick={() => qrInvitation && handleResend(qrInvitation)}>
+            <Button size="sm" disabled onClick={() => qrInvitation && handleResend(qrInvitation)}>
               <Send size={14} />
               Kirim Ulang
             </Button>

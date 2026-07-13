@@ -5,6 +5,7 @@ import type { RSVP, RSVPBreakdown } from '@/types';
 interface ApiRSVP {
   id: string;
   guest_id: string;
+  guest_full_name?: string | null;
   event_id: string;
   status: RSVP['status'];
   guest_count?: number;
@@ -38,6 +39,7 @@ function normalizeRSVP(item: ApiRSVP): RSVP {
   return {
     id: item.id,
     guestId: item.guest_id,
+    guestName: item.guest_full_name ?? undefined,
     eventId: item.event_id,
     status: item.status,
     guestCount: asCount(item.guest_count ?? item.guestCount),
@@ -69,6 +71,25 @@ function normalizeBreakdown(data?: ApiRSVPBreakdown): RSVPBreakdown {
   };
 }
 
+function toBackendRSVPUpdate(data: Partial<RSVP>): Record<string, unknown> {
+  const status = data.status;
+  const guestCount =
+    data.guestCount !== undefined
+      ? data.guestCount
+      : status === 'attending'
+        ? 1
+        : status === 'not_attending'
+          ? 0
+          : undefined;
+
+  return {
+    ...(status ? { status } : {}),
+    ...(guestCount !== undefined ? { attending_pax: guestCount } : {}),
+    ...(data.guestCount !== undefined ? { adults: Math.max(0, data.guestCount) } : {}),
+    ...(data.message !== undefined ? { notes: data.message } : {}),
+  };
+}
+
 export function useRSVP(eventId?: string) {
   const [rsvps, setRsvps] = useState<RSVP[]>([]);
   const [breakdown, setBreakdown] = useState<RSVPBreakdown>({
@@ -82,6 +103,20 @@ export function useRSVP(eventId?: string) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchRSVPs = useCallback(async () => {
+    if (!eventId) {
+      setRsvps([]);
+      setBreakdown({
+        attending: 0,
+        notAttending: 0,
+        maybe: 0,
+        noResponse: 0,
+        total: 0,
+      });
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -107,8 +142,12 @@ export function useRSVP(eventId?: string) {
 
   const updateRSVP = useCallback(
     async (id: string, data: Partial<RSVP>) => {
+      if (!eventId) {
+        throw new Error('Event aktif belum dipilih');
+      }
+
       try {
-        const response = await api.put<{ data: RSVP }>(`/rsvp/${id}`, data);
+        const response = await api.put<{ data: RSVP }>(`/rsvp/${id}`, toBackendRSVPUpdate(data));
         const updated = normalizeRSVP(response.data.data as unknown as ApiRSVP);
         setRsvps((prev) => prev.map((r) => (r.id === id ? updated : r)));
         return updated;
@@ -117,7 +156,7 @@ export function useRSVP(eventId?: string) {
         throw new Error(axiosErr.response?.data?.message ?? 'Gagal memperbarui RSVP');
       }
     },
-    []
+    [eventId]
   );
 
   return {

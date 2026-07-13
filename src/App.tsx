@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import Layout from './components/Layout';
+import AuthenticatedLayout from './components/AuthenticatedLayout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -27,7 +27,7 @@ function App() {
       <Route path="/register" element={<Register />} />
 
       {/* App routes — with sidebar layout */}
-      <Route element={<Layout />}>
+      <Route element={<AuthenticatedLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="acara" element={<Acara />} />
         <Route path="tamu" element={<Tamu />} />

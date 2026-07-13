@@ -1,5 +1,13 @@
 import { create } from 'zustand';
 import type { User } from '@/types';
+import { useTenantStore } from '@/store/tenantStore';
+
+function readStoredToken() {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('gf_access_token');
+  if (!raw || raw === 'undefined' || raw === 'null') return null;
+  return raw;
+}
 
 interface AuthState {
   accessToken: string | null;
@@ -16,7 +24,7 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  accessToken: typeof window !== 'undefined' ? localStorage.getItem('gf_access_token') : null,
+  accessToken: readStoredToken(),
   user: (() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -38,6 +46,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: () => {
     localStorage.removeItem('gf_access_token');
     localStorage.removeItem('gf_user');
+    useTenantStore.getState().setTenant(null);
+    useTenantStore.getState().setCurrentEvent(null);
     set({ accessToken: null, user: null, error: null });
   },
 

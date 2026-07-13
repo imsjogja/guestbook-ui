@@ -1,7 +1,14 @@
 import { useState, useCallback } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
+import { bootstrapWorkspace } from '@/lib/workspace';
 import type { AuthResponse, LoginRequest, RegisterRequest } from '@/types';
+
+function assertAuthResponse(response: AuthResponse) {
+  if (!response?.access_token || !response?.user?.id) {
+    throw new Error('Respons login tidak valid');
+  }
+}
 
 export function useAuth() {
   const storeLogin = useAuthStore((s) => s.login);
@@ -16,17 +23,24 @@ export function useAuth() {
     async (data: LoginRequest) => {
       setIsLoading(true);
       setError(null);
+      let sessionStarted = false;
       try {
         const response = await api.post<AuthResponse>('/auth/login', {
           email: data.email,
           password: data.password,
         });
+        assertAuthResponse(response.data);
         const { access_token, user: userData } = response.data;
         storeLogin(access_token, userData);
+        sessionStarted = true;
+        await bootstrapWorkspace({ reset: true, requireTenant: true, requireEvent: true });
         return response.data;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        const msg = axiosErr.response?.data?.message ?? 'Email atau kata sandi salah';
+        if (sessionStarted) {
+          storeLogout();
+        }
+        const axiosErr = err as { response?: { data?: { message?: string; error?: string } } };
+        const msg = axiosErr.response?.data?.message ?? axiosErr.response?.data?.error ?? (err instanceof Error ? err.message : 'Email atau kata sandi salah');
         setError(msg);
         throw new Error(msg);
       } finally {
@@ -40,6 +54,7 @@ export function useAuth() {
     async (data: RegisterRequest) => {
       setIsLoading(true);
       setError(null);
+      let sessionStarted = false;
       try {
         const response = await api.post<AuthResponse>('/auth/register', {
           full_name: data.fullName,
@@ -47,19 +62,26 @@ export function useAuth() {
           password: data.password,
           tenant_subdomain: data.tenantSubdomain,
         });
+        assertAuthResponse(response.data);
         const { access_token, user: userData } = response.data;
         storeLogin(access_token, userData);
+        sessionStarted = true;
+        await bootstrapWorkspace({ reset: true, requireTenant: false, requireEvent: false });
         return response.data;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
+        if (sessionStarted) {
+          storeLogout();
+        }
+        const axiosErr = err as { response?: { data?: { message?: string; error?: string; errors?: Record<string, string[]> } } };
         const msg = axiosErr.response?.data?.message;
         const errors = axiosErr.response?.data?.errors;
+        const fallback = axiosErr.response?.data?.error ?? (err instanceof Error ? err.message : undefined);
         let errorMsg: string;
         if (errors) {
           const firstError = Object.values(errors)[0]?.[0];
-          errorMsg = firstError ?? msg ?? 'Registrasi gagal';
+          errorMsg = firstError ?? msg ?? fallback ?? 'Registrasi gagal';
         } else {
-          errorMsg = msg ?? 'Registrasi gagal. Silakan coba lagi.';
+          errorMsg = msg ?? fallback ?? 'Registrasi gagal. Silakan coba lagi.';
         }
         setError(errorMsg);
         throw new Error(errorMsg);

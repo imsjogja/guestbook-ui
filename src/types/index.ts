@@ -105,6 +105,7 @@ export type RSVPStatus = 'attending' | 'not_attending' | 'maybe' | 'no_response'
 export interface RSVP {
   id: string;
   guestId: string;
+  guestName?: string;
   eventId: string;
   status: RSVPStatus;
   guestCount: number;

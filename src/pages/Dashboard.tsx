@@ -27,6 +27,7 @@ import {
   Tooltip,
 } from 'recharts';
 import { useAuthStore } from '@/store/authStore';
+import { useTenantStore } from '@/store/tenantStore';
 import { useGuests } from '@/hooks/useGuests';
 import { useRSVP } from '@/hooks/useRSVP';
 import { useCheckin } from '@/hooks/useCheckin';
@@ -226,10 +227,11 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 export default function Dashboard() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const currentEventId = useTenantStore((s) => s.currentEvent?.id);
   const [attendanceTab, setAttendanceTab] = useState<'7' | '30' | '90'>('30');
 
   const { guests: guestsData, isLoading: guestsLoading } = useGuests();
-  const { rsvps, breakdown, isLoading: rsvpLoading } = useRSVP();
+  const { rsvps, breakdown, isLoading: rsvpLoading } = useRSVP(currentEventId);
   const { checkins, stats, isLoading: checkinLoading } = useCheckin();
   const { events: eventsData, isLoading: eventsLoading } = useEvents();
 

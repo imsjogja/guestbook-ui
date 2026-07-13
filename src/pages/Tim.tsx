@@ -116,16 +116,20 @@ export default function Tim() {
     }
     setIsSubmitting(true);
     try {
-      await inviteMember({ email: inviteEmail, role: inviteRole, message: inviteMessage || undefined });
-      setInviteSent(true);
-      toast.success('Undangan terkirim');
-      setTimeout(() => {
-        setIsInviteOpen(false);
-        setInviteSent(false);
-        setInviteEmail('');
-        setInviteRole('editor');
-        setInviteMessage('');
-      }, 2000);
+      const success = await inviteMember({ email: inviteEmail, role: inviteRole, message: inviteMessage || undefined });
+      if (success) {
+        setInviteSent(true);
+        toast.success('Undangan terkirim');
+        setTimeout(() => {
+          setIsInviteOpen(false);
+          setInviteSent(false);
+          setInviteEmail('');
+          setInviteRole('editor');
+          setInviteMessage('');
+        }, 2000);
+      } else {
+        toast.error('Gagal mengirim undangan');
+      }
     } catch {
       toast.error('Gagal mengirim undangan');
     } finally {
@@ -162,8 +166,10 @@ export default function Tim() {
       const success = await updateRole(editingMember.id, editingMember.role);
       if (success) {
         toast.success('Peran berhasil diperbarui');
+        setIsEditRoleOpen(false);
+      } else {
+        toast.error('Gagal memperbarui peran');
       }
-      setIsEditRoleOpen(false);
     } catch {
       toast.error('Gagal memperbarui peran');
     } finally {

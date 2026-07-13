@@ -10,6 +10,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useTenantStore } from '@/store/tenantStore';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -45,7 +46,7 @@ export default function Register() {
         email,
         password,
       });
-      navigate('/');
+      navigate(useTenantStore.getState().currentTenant ? '/' : '/pengaturan');
     } catch {
       setShakeError(true);
       setTimeout(() => setShakeError(false), 300);
