@@ -33,7 +33,7 @@ export function useAuth() {
         const { access_token, user: userData } = response.data;
         storeLogin(access_token, userData);
         sessionStarted = true;
-        await bootstrapWorkspace({ reset: true, requireTenant: true, requireEvent: true });
+        await bootstrapWorkspace({ reset: true, requireTenant: false, requireEvent: false });
         return response.data;
       } catch (err: unknown) {
         if (sessionStarted) {

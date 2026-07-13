@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Loader2, LogOut } from 'lucide-react';
 import Layout from './Layout';
+import WorkspaceOnboarding from './WorkspaceOnboarding';
 import { bootstrapWorkspace } from '@/lib/workspace';
 import { useAuthStore } from '@/store/authStore';
 import { useTenantStore } from '@/store/tenantStore';
@@ -22,10 +23,10 @@ export default function AuthenticatedLayout() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const currentTenant = useTenantStore((s) => s.currentTenant);
-  const currentEvent = useTenantStore((s) => s.currentEvent);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
-  const [didBootstrap, setDidBootstrap] = useState(false);
+  const [bootstrappedTenantId, setBootstrappedTenantId] = useState<string | null | undefined>(undefined);
+  const bootstrapInFlight = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,7 +39,13 @@ export default function AuthenticatedLayout() {
         return;
       }
 
-      if (didBootstrap || (currentTenant && currentEvent)) {
+      if (bootstrapInFlight.current) {
+        return;
+      }
+
+      const currentTenantId = currentTenant?.id ?? null;
+
+      if (bootstrappedTenantId !== undefined && bootstrappedTenantId === currentTenantId) {
         if (!cancelled) {
           setIsBootstrapping(false);
         }
@@ -46,16 +53,20 @@ export default function AuthenticatedLayout() {
       }
 
       try {
+        bootstrapInFlight.current = true;
         setBootstrapError(null);
-        await bootstrapWorkspace({ requireTenant: true, requireEvent: true });
+        const result = await bootstrapWorkspace({ requireTenant: false, requireEvent: false });
+        if (!cancelled) {
+          setBootstrappedTenantId(result.tenant?.id ?? null);
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Gagal menyiapkan workspace';
         if (!cancelled) {
           setBootstrapError(message);
         }
       } finally {
+        bootstrapInFlight.current = false;
         if (!cancelled) {
-          setDidBootstrap(true);
           setIsBootstrapping(false);
         }
       }
@@ -66,7 +77,7 @@ export default function AuthenticatedLayout() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, user, currentTenant, currentEvent, didBootstrap]);
+  }, [accessToken, user, currentTenant, bootstrappedTenantId]);
 
   if (!accessToken || !user) {
     return <Navigate to="/login" replace />;
@@ -97,6 +108,10 @@ export default function AuthenticatedLayout() {
         </div>
       </div>
     );
+  }
+
+  if (!currentTenant) {
+    return <WorkspaceOnboarding />;
   }
 
   return <Layout />;

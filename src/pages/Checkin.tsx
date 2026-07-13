@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { normalizeScanToken } from '@/lib/scan-token';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -72,121 +73,152 @@ function formatTimeAgo(dateStr: string): string {
 // ── Scanner Tab Component ────────────────────────────
 
 function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => void }) {
-  const [scanning, setScanning] = useState(false);
   const [cameraOn, setCameraOn] = useState(true);
+  const [scanInput, setScanInput] = useState('');
   const [overlay, setOverlay] = useState<'success' | 'error' | null>(null);
-  const [overlayName, setOverlayName] = useState('');
-  const [overlayError, setOverlayError] = useState('');
-  const scanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [overlayTitle, setOverlayTitle] = useState('');
+  const [overlayMessage, setOverlayMessage] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const overlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { scanToken } = useCheckin();
 
-  const simulateScan = useCallback(() => {
-    setScanning(true);
-    scanTimer.current = setTimeout(() => {
-      const isSuccess = Math.random() > 0.2;
-      if (isSuccess) {
-        const names = ['Diana Wijaya', 'Budi Santoso', 'Citra Lestari', 'Ahmad Fauzi', 'Siti Rahayu', 'Rudi Hartono', 'Eko Prasetyo', 'Lina Kusuma', 'Fajar Nugroho'];
-        const randomName = names[Math.floor(Math.random() * names.length)];
-        setOverlayName(randomName);
-        setOverlay('success');
-        onCheckinSuccess(randomName);
-      } else {
-        setOverlayError('Kode QR tidak valid atau sudah digunakan');
-        setOverlay('error');
-      }
-      setScanning(false);
-    }, 2000);
-  }, [onCheckinSuccess]);
+  const clearOverlay = () => {
+    setOverlay(null);
+    setOverlayTitle('');
+    setOverlayMessage('');
+  };
 
   useEffect(() => {
-    if (cameraOn && !overlay) {
-      const timer = setTimeout(simulateScan, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [cameraOn, overlay, simulateScan]);
-
-  useEffect(() => {
-    if (overlay) {
-      const timer = setTimeout(() => {
-        setOverlay(null);
-        setOverlayName('');
-        setOverlayError('');
-      }, overlay === 'success' ? 2500 : 3000);
-      return () => clearTimeout(timer);
-    }
+    if (!overlay) return;
+    overlayTimer.current = setTimeout(() => {
+      clearOverlay();
+    }, overlay === 'success' ? 2200 : 2800);
+    return () => {
+      if (overlayTimer.current) clearTimeout(overlayTimer.current);
+    };
   }, [overlay]);
 
   useEffect(() => {
     return () => {
-      if (scanTimer.current) clearTimeout(scanTimer.current);
+      if (overlayTimer.current) clearTimeout(overlayTimer.current);
     };
   }, []);
 
+  const handleScan = async () => {
+    const token = normalizeScanToken(scanInput);
+    if (!token) {
+      setOverlayTitle('Token kosong');
+      setOverlayMessage('Tempel token QR, barcode, atau URL undangan terlebih dahulu.');
+      setOverlay('error');
+      return;
+    }
+
+    setIsScanning(true);
+    try {
+      await scanToken(token, `QR/barcode scan: ${token}`, 1);
+      const label = token.length > 18 ? `${token.slice(0, 18)}…` : token;
+      setOverlayTitle('Check-in Berhasil');
+      setOverlayMessage(label);
+      setOverlay('success');
+      onCheckinSuccess(label);
+      setScanInput('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal memindai QR';
+      setOverlayTitle('QR tidak valid');
+      setOverlayMessage(msg);
+      setOverlay('error');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   return (
-    <div className="relative">
-      {/* Scanner Viewport */}
-      <div className="relative w-full min-h-[480px] bg-[#0f172a] rounded-2xl overflow-hidden flex items-center justify-center">
-        {/* Simulated camera feed background */}
+    <div className="space-y-4">
+      <div className="relative w-full min-h-[420px] bg-[#0f172a] rounded-2xl overflow-hidden flex items-center justify-center">
         <div className="absolute inset-0 bg-gradient-to-br from-[#1e293b] via-[#0f172a] to-[#1e293b] opacity-80" />
         <div className="absolute inset-0" style={{
           backgroundImage: `radial-gradient(circle at 20% 30%, rgba(79,70,229,0.08) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(16,185,129,0.06) 0%, transparent 50%)`,
         }} />
 
-        {cameraOn ? (
-          <>
-            {/* Scan frame */}
-            <div className="relative w-[280px] h-[280px]">
-              {/* Corner markers */}
-              <div className="absolute top-0 left-0 w-6 h-6 border-l-[3px] border-t-[3px] border-[#10b981] rounded-tl-sm animate-pulse" />
-              <div className="absolute top-0 right-0 w-6 h-6 border-r-[3px] border-t-[3px] border-[#10b981] rounded-tr-sm animate-pulse" />
-              <div className="absolute bottom-0 left-0 w-6 h-6 border-l-[3px] border-b-[3px] border-[#10b981] rounded-bl-sm animate-pulse" />
-              <div className="absolute bottom-0 right-0 w-6 h-6 border-r-[3px] border-b-[3px] border-[#10b981] rounded-br-sm animate-pulse" />
+        <div className="relative z-10 w-full max-w-xl px-6 py-10">
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-[#94a3b8]">Scan Mode</p>
+              <h3 className="text-2xl font-semibold text-white mt-1">QR / Barcode Check-in</h3>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="gap-2"
+              onClick={() => setCameraOn(!cameraOn)}
+            >
+              {cameraOn ? <CameraOff size={16} /> : <Camera size={16} />}
+              {cameraOn ? 'Matikan Kamera' : 'Nyalakan Kamera'}
+            </Button>
+          </div>
 
-              {/* Crosshair */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4">
-                <div className="absolute top-1/2 left-0 w-full h-px bg-white/20" />
-                <div className="absolute left-1/2 top-0 h-full w-px bg-white/20" />
-              </div>
-
-              {/* Scanning line animation */}
-              {scanning && (
+          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6">
+            <div className="mb-5 flex items-center justify-center">
+              <div className="relative w-[260px] h-[260px]">
+                <div className="absolute top-0 left-0 w-6 h-6 border-l-[3px] border-t-[3px] border-[#10b981] rounded-tl-sm" />
+                <div className="absolute top-0 right-0 w-6 h-6 border-r-[3px] border-t-[3px] border-[#10b981] rounded-tr-sm" />
+                <div className="absolute bottom-0 left-0 w-6 h-6 border-l-[3px] border-b-[3px] border-[#10b981] rounded-bl-sm" />
+                <div className="absolute bottom-0 right-0 w-6 h-6 border-r-[3px] border-b-[3px] border-[#10b981] rounded-br-sm" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center px-6">
+                    <ScanLine size={44} className="mx-auto text-white/80 mb-3" />
+                    <p className="text-white font-medium">Arahkan QR / Barcode ke kamera</p>
+                    <p className="text-white/60 text-xs mt-2">
+                      Atau tempel URL undangan / token hasil scan ke kolom bawah.
+                    </p>
+                  </div>
+                </div>
                 <motion.div
                   className="absolute left-0 right-0 h-[2px] bg-[#10b981] shadow-[0_0_8px_rgba(16,185,129,0.6)]"
-                  initial={{ top: '0%' }}
-                  animate={{ top: ['0%', '100%', '0%'] }}
-                  transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
+                  animate={isScanning ? { top: ['0%', '100%', '0%'] } : { top: '50%' }}
+                  transition={{ duration: 2, ease: 'linear', repeat: isScanning ? Infinity : 0 }}
                 />
-              )}
+              </div>
             </div>
 
-            {/* Status text */}
-            <div className="absolute bottom-24 left-0 right-0 text-center">
-              {scanning ? (
-                <div className="flex items-center justify-center gap-2">
-                  <Loader2 size={16} className="animate-spin text-[#94a3b8]" />
-                  <span className="text-[#94a3b8] text-sm">Memindai...</span>
-                </div>
-              ) : (
-                <span className="text-[#64748b] text-sm">Arahkan kode QR ke dalam kotak</span>
-              )}
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                <input
+                  value={scanInput}
+                  onChange={(e) => setScanInput(e.target.value)}
+                  placeholder="Tempel token QR, barcode, atau URL undangan"
+                  className="h-11 rounded-lg border border-white/10 bg-white/10 px-4 text-sm text-white placeholder:text-white/40 outline-none focus:border-[#10b981] focus:ring-2 focus:ring-[#10b981]/20"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleScan();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  className="h-11 bg-[#10b981] hover:bg-[#059669] text-white gap-2"
+                  onClick={() => void handleScan()}
+                  disabled={isScanning}
+                >
+                  {isScanning ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                  Proses Scan
+                </Button>
+              </div>
+              <p className="text-xs text-white/55">
+                Scanner barcode fisik biasanya langsung mengetikkan token ke kolom ini, jadi alur tetap bisa dipakai di lokasi acara.
+              </p>
             </div>
-          </>
-        ) : (
-          <div className="text-center">
-            <CameraOff size={48} className="text-[#334155] mx-auto mb-4" />
-            <p className="text-[#64748b] text-sm">Kamera dimatikan</p>
-            <p className="text-[#475569] text-xs mt-1">Gunakan mode manual untuk check-in</p>
           </div>
-        )}
+        </div>
 
-        {/* Success Overlay */}
         <AnimatePresence>
-          {overlay === 'success' && (
+          {overlay && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="absolute inset-0 bg-[#10b981]/95 flex flex-col items-center justify-center z-10"
+              className={`absolute inset-0 flex flex-col items-center justify-center z-10 ${overlay === 'success' ? 'bg-[#10b981]/95' : 'bg-[#f43f5e]/95'}`}
             >
               <motion.div
                 initial={{ scale: 0 }}
@@ -195,98 +227,45 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
                 transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 }}
                 className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center mb-6"
               >
-                <Check size={40} className="text-white" />
+                {overlay === 'success' ? <Check size={40} className="text-white" /> : <X size={40} className="text-white" />}
               </motion.div>
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
+                transition={{ delay: 0.2 }}
                 className="text-white text-2xl font-bold"
               >
-                Check-in Berhasil!
+                {overlayTitle}
               </motion.p>
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="text-white/90 text-base mt-2"
-              >
-                {overlayName}
-              </motion.p>
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="text-white/60 text-xs mt-3 font-mono"
-              >
-                {new Date().toLocaleTimeString('id-ID', { hour12: false })} WIB
-              </motion.p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Error Overlay */}
-        <AnimatePresence>
-          {overlay === 'error' && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="absolute inset-0 bg-[#f43f5e]/95 flex flex-col items-center justify-center z-10"
-            >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 }}
-                className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center mb-6"
-              >
-                <X size={40} className="text-white" />
-              </motion.div>
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="text-white text-2xl font-bold"
+                className="text-white/85 text-sm mt-2 text-center px-8"
               >
-                Kode QR Tidak Valid
-              </motion.p>
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="text-white/70 text-sm mt-2 text-center px-8"
-              >
-                {overlayError}
-              </motion.p>
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="text-white/50 text-xs mt-3"
-              >
-                Silakan periksa kembali atau hubungi panitia
+                {overlayMessage}
               </motion.p>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Camera Controls */}
-      <div className="flex items-center justify-center gap-3 mt-4">
-        <Button variant="secondary" size="sm" className="gap-2" onClick={() => { setCameraOn(true); }}>
+      <div className="flex items-center justify-center gap-3">
+        <Button variant="secondary" size="sm" className="gap-2" onClick={() => setScanInput('')}>
           <RefreshCw size={16} />
-          Ganti Kamera
+          Bersihkan
         </Button>
         <Button
           variant="secondary"
           size="sm"
           className="gap-2"
-          onClick={() => { setCameraOn(!cameraOn); setScanning(false); }}
+          onClick={() => {
+            setCameraOn(true);
+            setScanInput('');
+          }}
         >
-          {cameraOn ? <CameraOff size={16} /> : <Camera size={16} />}
-          {cameraOn ? 'Matikan Kamera' : 'Nyalakan Kamera'}
+          <Camera size={16} />
+          Reset Scanner
         </Button>
       </div>
     </div>

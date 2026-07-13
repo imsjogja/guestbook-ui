@@ -31,6 +31,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { useTenantStore } from '@/store/tenantStore';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -231,15 +232,21 @@ function TableCard({
 // ── Main Seating Page ────────────────────────────────
 
 export default function TempatDuduk() {
-  const { tables, isLoading, error, refetch, assignGuest, unassignGuest, autoAssign } = useSeating();
+  const { tables, isLoading, error, refetch, createTable, assignGuest, unassignGuest, autoAssign } = useSeating();
   const { guests } = useGuests();
+  const currentEventId = useTenantStore((s) => s.currentEvent?.id);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [showCreateTable, setShowCreateTable] = useState(false);
   const [showAutoAssign, setShowAutoAssign] = useState(false);
   const [autoAssignAlgo, setAutoAssignAlgo] = useState('guest_type');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [createTableName, setCreateTableName] = useState('');
+  const [createTableShape, setCreateTableShape] = useState<'round' | 'rectangle' | 'square'>('round');
+  const [createTableCapacity, setCreateTableCapacity] = useState('8');
+  const [isCreatingTable, setIsCreatingTable] = useState(false);
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
 
@@ -336,6 +343,52 @@ export default function TempatDuduk() {
     }
   };
 
+  const openCreateTable = () => {
+    if (!currentEventId) {
+      toast.error('Event aktif belum dipilih');
+      return;
+    }
+
+    setCreateTableName('');
+    setCreateTableShape('round');
+    setCreateTableCapacity('8');
+    setShowCreateTable(true);
+  };
+
+  const handleCreateTable = async () => {
+    if (!currentEventId) {
+      toast.error('Event aktif belum dipilih');
+      return;
+    }
+
+    const capacity = Number(createTableCapacity);
+    if (!createTableName.trim() || !Number.isFinite(capacity) || capacity < 1) {
+      toast.error('Nama meja dan kapasitas wajib diisi');
+      return;
+    }
+
+    setIsCreatingTable(true);
+    try {
+      const result = await createTable({
+        name: createTableName.trim(),
+        shape: createTableShape,
+        capacity,
+        eventId: currentEventId,
+        assignedGuests: [],
+        positionX: 0,
+        positionY: 0,
+      });
+      if (result) {
+        toast.success('Meja berhasil dibuat');
+        setShowCreateTable(false);
+      }
+    } catch {
+      toast.error('Gagal membuat meja');
+    } finally {
+      setIsCreatingTable(false);
+    }
+  };
+
   const handleReset = () => {
     // Reset: unassign all guests from the selected table
     if (selectedTableId) {
@@ -379,7 +432,7 @@ export default function TempatDuduk() {
             <p className="text-sm text-[#64748b] mt-1">Atur tata letak meja dan penempatan tamu</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Button size="sm" className="gap-2 bg-[#4f46e5] hover:bg-[#6366f1]">
+            <Button size="sm" className="gap-2 bg-[#4f46e5] hover:bg-[#6366f1]" onClick={openCreateTable}>
               <Plus size={16} />
               Tambah Meja
             </Button>
@@ -788,6 +841,67 @@ export default function TempatDuduk() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Create Table Modal */}
+      <Dialog open={showCreateTable} onOpenChange={setShowCreateTable}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Armchair size={18} className="text-[#4f46e5]" />
+              Tambah Meja
+            </DialogTitle>
+            <DialogDescription>
+              Buat meja baru untuk event aktif sebelum melakukan penempatan tamu.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-xs font-medium text-[#64748b] mb-1 block">Nama Meja</label>
+              <Input
+                value={createTableName}
+                onChange={(e) => setCreateTableName(e.target.value)}
+                placeholder="Meja 1"
+                className="h-10"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-[#64748b] mb-1 block">Bentuk</label>
+                <select
+                  value={createTableShape}
+                  onChange={(e) => setCreateTableShape(e.target.value as 'round' | 'rectangle' | 'square')}
+                  className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20"
+                >
+                  <option value="round">Bulat</option>
+                  <option value="rectangle">Persegi Panjang</option>
+                  <option value="square">Persegi</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#64748b] mb-1 block">Kapasitas</label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={createTableCapacity}
+                  onChange={(e) => setCreateTableCapacity(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateTable(false)}>
+              Batal
+            </Button>
+            <Button className="bg-[#4f46e5] hover:bg-[#6366f1] gap-2" onClick={handleCreateTable} disabled={isCreatingTable}>
+              {isCreatingTable ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+              Simpan Meja
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Auto-Assign Modal */}
       <Dialog open={showAutoAssign} onOpenChange={setShowAutoAssign}>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { Checkin } from '@/types';
+import { useTenantStore } from '@/store/tenantStore';
 
 interface CheckinStats {
   totalToday: number;
@@ -80,6 +81,8 @@ function normalizeStats(data?: ApiCheckinStats): CheckinStats {
 }
 
 export function useCheckin(eventId?: string) {
+  const currentEventId = useTenantStore((s) => s.currentEvent?.id);
+  const activeEventId = eventId ?? currentEventId;
   const [checkins, setCheckins] = useState<Checkin[]>([]);
   const [stats, setStats] = useState<CheckinStats>({
     totalToday: 0,
@@ -90,10 +93,18 @@ export function useCheckin(eventId?: string) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchCheckins = useCallback(async () => {
+    if (!activeEventId) {
+      setCheckins([]);
+      setStats({ totalToday: 0, total: 0, byMethod: { qr: 0, manual: 0, walkIn: 0 } });
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
-      const params = eventId ? { eventId } : {};
+      const params = activeEventId ? { eventId: activeEventId } : {};
       const [checkinsRes, statsRes] = await Promise.allSettled([
         api.get<{ data: ApiCheckin[] }>('/checkins', { params }),
         api.get<{ data: ApiCheckinStats }>('/checkins/stats', { params }),
@@ -121,7 +132,7 @@ export function useCheckin(eventId?: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [eventId]);
+  }, [activeEventId]);
 
   useEffect(() => {
     fetchCheckins();
@@ -134,12 +145,16 @@ export function useCheckin(eventId?: string) {
       notes?: string,
       actualPax = 1
     ) => {
+      if (!activeEventId) {
+        throw new Error('Event aktif belum dipilih');
+      }
+
       try {
         const backendMethod = method === 'qr' ? 'qr_scan' : 'manual_search';
         const response = await api.post<{ data: Checkin }>('/checkins', {
           method: backendMethod,
           guest_id: guestId,
-          event_id: eventId,
+          event_id: activeEventId,
           actual_pax: actualPax,
           adults: actualPax,
           children: 0,
@@ -153,7 +168,34 @@ export function useCheckin(eventId?: string) {
         throw new Error(axiosErr.response?.data?.message ?? 'Gagal melakukan check-in');
       }
     },
-    [eventId]
+    [activeEventId]
+  );
+
+  const scanToken = useCallback(
+    async (token: string, notes?: string, actualPax = 1) => {
+      if (!activeEventId) {
+        throw new Error('Event aktif belum dipilih');
+      }
+
+      try {
+        const response = await api.post<{ data: Checkin }>('/checkins', {
+          method: 'qr_scan',
+          token,
+          event_id: activeEventId,
+          actual_pax: actualPax,
+          adults: actualPax,
+          children: 0,
+          notes,
+        });
+        const newCheckin = normalizeCheckin(response.data.data as unknown as ApiCheckin);
+        setCheckins((prev) => [newCheckin, ...prev]);
+        return newCheckin;
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { data?: { message?: string } } };
+        throw new Error(axiosErr.response?.data?.message ?? 'Gagal memindai QR');
+      }
+    },
+    [activeEventId]
   );
 
   const walkIn = useCallback(
@@ -186,7 +228,7 @@ export function useCheckin(eventId?: string) {
         throw new Error(axiosErr.response?.data?.message ?? 'Gagal mendaftarkan walk-in');
       }
     },
-    [eventId]
+    [activeEventId]
   );
 
   return {
@@ -196,6 +238,7 @@ export function useCheckin(eventId?: string) {
     error,
     refetch: fetchCheckins,
     checkin,
+    scanToken,
     walkIn,
   };
 }

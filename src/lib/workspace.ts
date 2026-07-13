@@ -3,7 +3,7 @@ import { useTenantStore } from '@/store/tenantStore';
 import type { ApiResponse, Event, Tenant } from '@/types';
 import { normalizeEvent, type BackendEvent } from '@/lib/normalizers';
 
-type BackendTenant = {
+export type BackendTenant = {
   id: string;
   name: string;
   slug: string;
@@ -51,7 +51,7 @@ function normalizeTenantSettings(raw?: Record<string, unknown> | null): Tenant['
   };
 }
 
-function normalizeTenant(raw: BackendTenant): Tenant {
+export function normalizeTenant(raw: BackendTenant): Tenant {
   const status = raw.status === 'suspended' || raw.status === 'cancelled'
     ? raw.status
     : 'active';
@@ -91,14 +91,20 @@ export async function bootstrapWorkspace(options: BootstrapOptions = {}): Promis
     store.setCurrentEvent(null);
   }
 
-  let tenant = store.currentTenant;
+  const tenantsRes = await api.get<ApiResponse<BackendTenant[]>>('/tenants');
+  const tenants = (tenantsRes.data.data ?? []).map(normalizeTenant);
+  store.setTenants(tenants);
 
-  if (!tenant) {
-    const tenantsRes = await api.get<ApiResponse<BackendTenant[]>>('/tenants');
-    const tenants = (tenantsRes.data.data ?? []).map(normalizeTenant);
-    store.setTenants(tenants);
-    tenant = tenants[0] ?? null;
+  const currentTenantId = store.currentTenant?.id;
+  let tenant = currentTenantId
+    ? tenants.find((item) => item.id === currentTenantId) ?? null
+    : tenants[0] ?? null;
+
+  if (tenant) {
     store.setTenant(tenant);
+  } else if (store.currentTenant) {
+    store.setTenant(null);
+    store.setCurrentEvent(null);
   }
 
   if (!tenant) {

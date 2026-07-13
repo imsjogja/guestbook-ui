@@ -3,6 +3,7 @@ import api from '@/lib/api';
 import type { Event } from '@/types';
 import type { ApiResponse } from '@/types';
 import { normalizeEvent, type BackendEvent } from '@/lib/normalizers';
+import { useTenantStore } from '@/store/tenantStore';
 
 type EventCreatePayload = {
   name: string;
@@ -102,6 +103,7 @@ export function useEvents() {
         const response = await api.post<ApiResponse<BackendEvent>>('/events', toEventPayload(data));
         const newEvent = normalizeEvent(response.data.data);
         setEvents((prev) => [newEvent, ...prev]);
+        useTenantStore.getState().setCurrentEvent(newEvent);
         return newEvent;
       } catch (err: unknown) {
         const axiosErr = err as { response?: { data?: { message?: string } } };

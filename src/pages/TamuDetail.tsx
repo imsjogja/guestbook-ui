@@ -96,11 +96,12 @@ export default function TamuDetail() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('ringkasan');
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
-  const { invitations } = useInvitations(currentEventId);
+  const { invitations, createInvitation } = useInvitations(currentEventId);
   const { rsvps, updateRSVP } = useRSVP(currentEventId);
   const [showRsvpEdit, setShowRsvpEdit] = useState(false);
   const [selectedRsvpStatus, setSelectedRsvpStatus] = useState<RSVPDetail['status']>('attending');
   const [isSavingRsvp, setIsSavingRsvp] = useState(false);
+  const [isCreatingInvitation, setIsCreatingInvitation] = useState(false);
 
   const { guest, isLoading, error } = useGuestDetail(id);
   const invitation = useMemo(
@@ -163,6 +164,22 @@ export default function TamuDetail() {
       toast.success('Link undangan disalin');
     } catch {
       toast.error('Gagal menyalin link undangan');
+    }
+  };
+
+  const handleCreateInvitation = async () => {
+    if (!guest) return;
+    setIsCreatingInvitation(true);
+    try {
+      const created = await createInvitation({ guestId: guest.id });
+      if (created) {
+        toast.success('Undangan berhasil dibuat');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal membuat undangan';
+      toast.error(msg);
+    } finally {
+      setIsCreatingInvitation(false);
     }
   };
 
@@ -586,6 +603,14 @@ export default function TamuDetail() {
                     <QrCode size={40} className="mx-auto text-[#94a3b8] mb-3" />
                     <p className="text-sm text-[#64748b]">QR code belum tersedia</p>
                     <p className="text-xs text-[#94a3b8] mt-1">Buat undangan terlebih dahulu untuk tamu ini.</p>
+                    <button
+                      onClick={handleCreateInvitation}
+                      disabled={!guest || isCreatingInvitation}
+                      className="mt-4 inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-[#4f46e5] text-white text-sm font-medium hover:bg-[#6366f1] disabled:opacity-60"
+                    >
+                      {isCreatingInvitation ? <Loader2 size={14} className="animate-spin" /> : <QrCode size={14} />}
+                      Buat Undangan
+                    </button>
                   </div>
                 )}
               </div>

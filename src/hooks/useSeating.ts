@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { Table, ApiResponse } from '@/types';
+import { useTenantStore } from '@/store/tenantStore';
 
 export interface UseSeatingReturn {
   tables: Table[];
@@ -16,11 +17,19 @@ export interface UseSeatingReturn {
 }
 
 export function useSeating(): UseSeatingReturn {
+  const currentEventId = useTenantStore((s) => s.currentEvent?.id);
   const [tables, setTables] = useState<Table[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchTables = useCallback(async () => {
+    if (!currentEventId) {
+      setTables([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -32,13 +41,19 @@ export function useSeating(): UseSeatingReturn {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentEventId]);
 
   useEffect(() => {
     fetchTables();
   }, [fetchTables]);
 
   const createTable = useCallback(async (data: Partial<Table>): Promise<Table | null> => {
+    if (!currentEventId) {
+      const msg = 'Event aktif belum dipilih';
+      setError(msg);
+      return null;
+    }
+
     try {
       const res = await api.post<ApiResponse<Table>>('/seating', data);
       const newTable = res.data.data;
@@ -52,6 +67,12 @@ export function useSeating(): UseSeatingReturn {
   }, []);
 
   const updateTable = useCallback(async (id: string, data: Partial<Table>): Promise<Table | null> => {
+    if (!currentEventId) {
+      const msg = 'Event aktif belum dipilih';
+      setError(msg);
+      return null;
+    }
+
     try {
       const res = await api.patch<ApiResponse<Table>>(`/seating/${id}`, data);
       const updated = res.data.data;
@@ -65,6 +86,12 @@ export function useSeating(): UseSeatingReturn {
   }, []);
 
   const deleteTable = useCallback(async (id: string): Promise<boolean> => {
+    if (!currentEventId) {
+      const msg = 'Event aktif belum dipilih';
+      setError(msg);
+      return false;
+    }
+
     try {
       await api.delete(`/seating/${id}`);
       setTables((prev) => prev.filter((t) => t.id !== id));
@@ -77,6 +104,12 @@ export function useSeating(): UseSeatingReturn {
   }, []);
 
   const assignGuest = useCallback(async (tableId: string, guestId: string): Promise<boolean> => {
+    if (!currentEventId) {
+      const msg = 'Event aktif belum dipilih';
+      setError(msg);
+      return false;
+    }
+
     try {
       await api.post(`/seating/${tableId}/assign`, { guestId });
       setTables((prev) =>
@@ -93,6 +126,12 @@ export function useSeating(): UseSeatingReturn {
   }, []);
 
   const unassignGuest = useCallback(async (tableId: string, guestId: string): Promise<boolean> => {
+    if (!currentEventId) {
+      const msg = 'Event aktif belum dipilih';
+      setError(msg);
+      return false;
+    }
+
     try {
       await api.post(`/seating/${tableId}/unassign`, { guestId });
       setTables((prev) =>
@@ -111,6 +150,12 @@ export function useSeating(): UseSeatingReturn {
   }, []);
 
   const autoAssign = useCallback(async (eventId: string): Promise<boolean> => {
+    if (!currentEventId) {
+      const msg = 'Event aktif belum dipilih';
+      setError(msg);
+      return false;
+    }
+
     try {
       await api.post('/seating/auto-assign', { eventId });
       await fetchTables();
