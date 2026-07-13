@@ -25,7 +25,6 @@ export default function AuthenticatedLayout() {
   const currentTenant = useTenantStore((s) => s.currentTenant);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
-  const [bootstrappedTenantId, setBootstrappedTenantId] = useState<string | null | undefined>(undefined);
   const bootstrapInFlight = useRef(false);
 
   useEffect(() => {
@@ -43,22 +42,13 @@ export default function AuthenticatedLayout() {
         return;
       }
 
-      const currentTenantId = currentTenant?.id ?? null;
-
-      if (bootstrappedTenantId !== undefined && bootstrappedTenantId === currentTenantId) {
-        if (!cancelled) {
-          setIsBootstrapping(false);
-        }
-        return;
-      }
-
       try {
         bootstrapInFlight.current = true;
-        setBootstrapError(null);
-        const result = await bootstrapWorkspace({ requireTenant: false, requireEvent: false });
         if (!cancelled) {
-          setBootstrappedTenantId(result.tenant?.id ?? null);
+          setIsBootstrapping(true);
         }
+        setBootstrapError(null);
+        await bootstrapWorkspace({ requireTenant: false, requireEvent: false });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Gagal menyiapkan workspace';
         if (!cancelled) {
@@ -77,7 +67,7 @@ export default function AuthenticatedLayout() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, user, currentTenant, bootstrappedTenantId]);
+  }, [accessToken, user]);
 
   if (!accessToken || !user) {
     return <Navigate to="/login" replace />;
