@@ -80,8 +80,8 @@ const rolePermissions: Record<TeamRole, { can: string[]; cannot: string[] }> = {
   },
 };
 
-function getInitials(name: string) {
-  return name
+function getInitials(name?: string | null) {
+  return (name ?? '')
     .split(' ')
     .map((n) => n[0])
     .join('')

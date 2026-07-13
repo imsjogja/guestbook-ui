@@ -111,7 +111,7 @@ export function useSeating(): UseSeatingReturn {
     }
 
     try {
-      await api.post(`/seating/${tableId}/assign`, { guestId });
+      await api.post(`/seating/${tableId}/assign`, { guest_id: guestId });
       setTables((prev) =>
         prev.map((t) =>
           t.id === tableId ? { ...t, assignedGuests: [...t.assignedGuests, guestId] } : t

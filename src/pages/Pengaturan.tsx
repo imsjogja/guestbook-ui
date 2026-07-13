@@ -46,8 +46,8 @@ const settingTabs = [
 
 type TabKey = typeof settingTabs[number]['key'];
 
-function getInitials(name: string): string {
-  return name
+function getInitials(name?: string | null): string {
+  return (name ?? '')
     .split(' ')
     .map((n) => n[0])
     .join('')
@@ -942,5 +942,4 @@ export default function Pengaturan() {
     </div>
   );
 }
-
 

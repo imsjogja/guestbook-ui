@@ -91,6 +91,7 @@ function ShapeIcon({ shape, size = 16 }: { shape: string; size?: number }) {
   switch (shape) {
     case 'round': return <div className={cn("rounded-full border-2 border-current", className)} style={{ width: size, height: size }} />;
     case 'square': return <div className={cn("rounded-sm border-2 border-current", className)} style={{ width: size, height: size }} />;
+    case 'rectangular':
     case 'rectangle': return <div className={cn("rounded-sm border-2 border-current", className)} style={{ width: size * 1.4, height: size * 0.8 }} />;
     default: return <Armchair size={size} className={className} />;
   }
@@ -244,7 +245,7 @@ export default function TempatDuduk() {
   const [autoAssignAlgo, setAutoAssignAlgo] = useState('guest_type');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [createTableName, setCreateTableName] = useState('');
-  const [createTableShape, setCreateTableShape] = useState<'round' | 'rectangle' | 'square'>('round');
+  const [createTableShape, setCreateTableShape] = useState<'round' | 'rectangular' | 'square'>('round');
   const [createTableCapacity, setCreateTableCapacity] = useState('8');
   const [isCreatingTable, setIsCreatingTable] = useState(false);
   const [isAutoAssigning, setIsAutoAssigning] = useState(false);
@@ -666,7 +667,11 @@ export default function TempatDuduk() {
                   </div>
                   <p className="text-xs text-[#64748b] mt-0.5">
                     {(assignments[selectedTable.id] || []).length}/{selectedTable.capacity} kursi &middot; {' '}
-                    {selectedTable.shape === 'round' ? 'Bulat' : selectedTable.shape === 'square' ? 'Persegi' : 'Persegi Panjang'}
+                  {selectedTable.shape === 'round'
+                    ? 'Bulat'
+                    : selectedTable.shape === 'square'
+                      ? 'Persegi'
+                      : 'Persegi Panjang'}
                   </p>
                 </div>
                 <button
@@ -870,11 +875,11 @@ export default function TempatDuduk() {
                 <label className="text-xs font-medium text-[#64748b] mb-1 block">Bentuk</label>
                 <select
                   value={createTableShape}
-                  onChange={(e) => setCreateTableShape(e.target.value as 'round' | 'rectangle' | 'square')}
+                  onChange={(e) => setCreateTableShape(e.target.value as 'round' | 'rectangular' | 'square')}
                   className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20"
                 >
                   <option value="round">Bulat</option>
-                  <option value="rectangle">Persegi Panjang</option>
+                  <option value="rectangular">Persegi Panjang</option>
                   <option value="square">Persegi</option>
                 </select>
               </div>

@@ -143,7 +143,7 @@ export interface Table {
   id: string;
   eventId: string;
   name: string;
-  shape: 'round' | 'rectangle' | 'square';
+  shape: 'round' | 'rectangle' | 'rectangular' | 'square';
   capacity: number;
   positionX: number;
   positionY: number;
