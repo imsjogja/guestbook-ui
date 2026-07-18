@@ -30,6 +30,12 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface RegistrationResponse {
+  message: string;
+  email_verification_required: boolean;
+  user: User;
+}
+
 // ── Tenant ────────────────────────────────────────────
 
 export interface Tenant {

@@ -8,6 +8,7 @@ import {
   EyeOff,
   User,
   Loader2,
+  MailCheck,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -23,6 +24,7 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [shakeError, setShakeError] = useState(false);
+  const [verificationRequired, setVerificationRequired] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -40,12 +42,16 @@ export default function Register() {
     }
 
     try {
-      await register({
+      const result = await register({
         fullName,
         email,
         password,
       });
-      navigate('/');
+      if ('email_verification_required' in result && result.email_verification_required) {
+        setVerificationRequired(true);
+      } else {
+        navigate('/');
+      }
     } catch {
       setShakeError(true);
       setTimeout(() => setShakeError(false), 300);
@@ -128,9 +134,29 @@ export default function Register() {
             transition={{ duration: 0.3 }}
             className="bg-white dark:bg-[#151c2c] rounded-2xl border border-[#e2e8f0] dark:border-[#334155] shadow-[0_4px_24px_rgba(15,23,42,0.06)] p-8 sm:p-10"
           >
-            <h2 className="text-lg font-semibold text-[#1e293b] dark:text-[#f8fafc] mb-6">
-              Daftar Akun GuestFlow
-            </h2>
+            {verificationRequired ? (
+              <div className="text-center py-4">
+                <div className="w-14 h-14 rounded-full bg-[#ecfdf5] text-[#059669] flex items-center justify-center mx-auto mb-5">
+                  <MailCheck size={28} />
+                </div>
+                <h2 className="text-lg font-semibold text-[#1e293b] dark:text-[#f8fafc] mb-3">
+                  Cek email Anda
+                </h2>
+                <p className="text-sm text-[#64748b] leading-relaxed">
+                  Kami sudah mengirim tautan verifikasi ke <strong className="text-[#1e293b]">{email}</strong>. Verifikasi email sebelum masuk ke GuestFlow.
+                </p>
+                <Link
+                  to="/login"
+                  className="mt-6 w-full h-11 bg-[#4f46e5] hover:bg-[#6366f1] text-white font-medium rounded-lg flex items-center justify-center transition-colors"
+                >
+                  Kembali ke halaman masuk
+                </Link>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-lg font-semibold text-[#1e293b] dark:text-[#f8fafc] mb-6">
+                  Daftar Akun GuestFlow
+                </h2>
 
             {error && (
               <motion.div
@@ -239,6 +265,8 @@ export default function Register() {
                 )}
               </button>
             </form>
+              </>
+            )}
           </motion.div>
 
           {/* Footer */}

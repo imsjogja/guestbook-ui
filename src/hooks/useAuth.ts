@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
-import type { AuthResponse, LoginRequest, RegisterRequest } from '@/types';
+import type { AuthResponse, LoginRequest, RegisterRequest, RegistrationResponse } from '@/types';
 
 function assertAuthResponse(response: AuthResponse) {
   if (!response?.access_token || !response?.refresh_token || !response?.user?.id) {
@@ -53,14 +53,17 @@ export function useAuth() {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await api.post<AuthResponse>('/auth/register', {
+        const response = await api.post<AuthResponse | RegistrationResponse>('/auth/register', {
           full_name: data.fullName,
           email: data.email,
           password: data.password,
           tenant_subdomain: data.tenantSubdomain,
         });
-        assertAuthResponse(response.data);
-        const { access_token, refresh_token, user: userData } = response.data;
+        if ('email_verification_required' in response.data && response.data.email_verification_required) {
+          return response.data;
+        }
+        assertAuthResponse(response.data as AuthResponse);
+        const { access_token, refresh_token, user: userData } = response.data as AuthResponse;
         storeLogin(access_token, refresh_token, userData);
         return response.data;
       } catch (err: unknown) {
