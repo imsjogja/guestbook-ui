@@ -15,19 +15,47 @@ const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, isLoading, error } = useAuth();
+  const { login, isLoading, error, requestPasswordReset, requestMagicLink } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [shakeError, setShakeError] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [emailActionMessage, setEmailActionMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
       await login({ email, password });
       navigate('/');
+    } catch {
+      setShakeError(true);
+      setTimeout(() => setShakeError(false), 300);
+    }
+  };
+
+  const handleForgotPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      await requestPasswordReset(forgotEmail || email);
+      setEmailActionMessage('Jika akun tersedia, link reset kata sandi sudah dikirim. Periksa Inbox atau Spam.');
+    } catch {
+      setShakeError(true);
+      setTimeout(() => setShakeError(false), 300);
+    }
+  };
+
+  const handleMagicLink = async () => {
+    if (!email) {
+      setEmailActionMessage('Isi email terlebih dahulu untuk menerima link masuk.');
+      return;
+    }
+    try {
+      await requestMagicLink(email);
+      setEmailActionMessage('Jika akun tersedia dan sudah terverifikasi, link masuk sudah dikirim.');
     } catch {
       setShakeError(true);
       setTimeout(() => setShakeError(false), 300);
@@ -184,12 +212,13 @@ export default function Login() {
                   />
                   <span className="text-sm text-[#64748b]">Ingat Saya</span>
                 </label>
-                <Link
-                  to="#"
+                <button
+                  type="button"
+                  onClick={() => { setForgotEmail(email); setShowForgotPassword((value) => !value); setEmailActionMessage(null); }}
                   className="text-sm text-[#4f46e5] hover:underline transition-colors"
                 >
                   Lupa Kata Sandi?
-                </Link>
+                </button>
               </div>
 
               {/* Login button */}
@@ -209,6 +238,32 @@ export default function Login() {
               </button>
             </form>
 
+            {showForgotPassword && (
+              <form onSubmit={handleForgotPassword} className="mt-5 rounded-lg border border-[#e2e8f0] dark:border-[#334155] bg-[#f8fafc] dark:bg-[#0b0f19] p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">Reset kata sandi</p>
+                  <p className="text-xs text-[#64748b] mt-1">Masukkan email untuk menerima link reset.</p>
+                </div>
+                <input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder="nama@perusahaan.com"
+                  required
+                  className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] dark:border-[#334155] bg-white dark:bg-[#151c2c] text-sm text-[#0f172a] dark:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1]"
+                />
+                <button type="submit" disabled={isLoading} className="w-full h-10 rounded-lg bg-[#1e293b] hover:bg-[#334155] text-white text-sm font-medium disabled:opacity-70">
+                  {isLoading ? 'Mengirim...' : 'Kirim link reset'}
+                </button>
+              </form>
+            )}
+
+            {emailActionMessage && (
+              <div className="mt-4 px-4 py-3 rounded-lg bg-[#ecfdf5] border border-[#10b981]/20 text-sm text-[#047857]">
+                {emailActionMessage}
+              </div>
+            )}
+
             {/* Divider */}
             <div className="flex items-center gap-4 my-6">
               <div className="flex-1 h-px bg-[#e2e8f0] dark:bg-[#334155]" />
@@ -219,6 +274,8 @@ export default function Login() {
             {/* Magic link button */}
             <button
               type="button"
+              onClick={handleMagicLink}
+              disabled={isLoading}
               className="w-full h-10 bg-[#f1f5f9] hover:bg-[#e2e8f0] dark:bg-[#1e293b] dark:hover:bg-[#334155] text-[#1e293b] dark:text-[#f8fafc] font-medium rounded-lg flex items-center justify-center gap-2 border border-[#e2e8f0] dark:border-[#334155] transition-all duration-150"
             >
               <LinkIcon size={16} />

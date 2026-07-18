@@ -4,6 +4,8 @@ import EventRequired from './components/EventRequired';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import VerifyEmail from './pages/VerifyEmail';
+import ResetPassword from './pages/ResetPassword';
+import MagicLogin from './pages/MagicLogin';
 import Dashboard from './pages/Dashboard';
 
 // Stub pages — will be implemented by page agents
@@ -29,6 +31,8 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/magic-login" element={<MagicLogin />} />
 
       {/* App routes — with sidebar layout */}
         <Route element={<AuthenticatedLayout />}>

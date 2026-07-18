@@ -92,6 +92,48 @@ export function useAuth() {
     [storeLogin]
   );
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await api.post('/auth/forgot-password', { email });
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      const message = axiosErr.response?.data?.message ?? (err instanceof Error && err.message === 'Network Error'
+        ? 'Tidak dapat terhubung ke server. Pastikan backend Docker aktif.'
+        : 'Permintaan reset kata sandi gagal.');
+      setError(message);
+      throw new Error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const requestMagicLink = useCallback(async (email: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await api.post('/auth/magic-link', { email });
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      const message = axiosErr.response?.data?.message ?? (err instanceof Error && err.message === 'Network Error'
+        ? 'Tidak dapat terhubung ke server. Pastikan backend Docker aktif.'
+        : 'Permintaan link masuk gagal.');
+      setError(message);
+      throw new Error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const consumeMagicLink = useCallback(async (token: string) => {
+    const response = await api.post<AuthResponse>('/auth/magic-link/consume', { token });
+    assertAuthResponse(response.data);
+    const { access_token, refresh_token, user: userData } = response.data;
+    storeLogin(access_token, refresh_token, userData);
+    return response.data;
+  }, [storeLogin]);
+
   const logout = useCallback(() => {
     storeLogout();
   }, [storeLogout]);
@@ -103,6 +145,9 @@ export function useAuth() {
     error,
     login,
     register,
+    requestPasswordReset,
+    requestMagicLink,
+    consumeMagicLink,
     logout,
   };
 }
