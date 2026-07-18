@@ -43,7 +43,7 @@ function mapStatusToBackend(status?: Event['status']): EventUpdatePayload['statu
   }
 }
 
-function mapEventTypeToBackend(type?: Event['eventType']): EventCreatePayload['type'] {
+export function mapEventTypeToBackend(type?: Event['eventType']): EventCreatePayload['type'] {
   switch (type) {
     case 'wedding':
       return 'wedding';
@@ -70,6 +70,18 @@ function toEventPayload(data: Partial<Event>): EventCreatePayload {
     dress_code: undefined,
     privacy_notice: undefined,
     guest_policy: undefined,
+  };
+}
+
+export function toEventUpdatePayload(data: Partial<Event>): EventUpdatePayload {
+  return {
+    ...(data.name ? { name: data.name } : {}),
+    ...(data.eventType ? { type: mapEventTypeToBackend(data.eventType) } : {}),
+    ...(data.startDate ? { start_date: data.startDate } : {}),
+    ...(data.endDate ? { end_date: data.endDate } : {}),
+    ...(data.location ? { description: data.location } : {}),
+    ...(data.capacity !== undefined ? { capacity: data.capacity } : {}),
+    ...(data.status ? { status: mapStatusToBackend(data.status) } : {}),
   };
 }
 
@@ -124,15 +136,7 @@ export function useEvents() {
   const updateEvent = useCallback(
     async (id: string, data: Partial<Event>) => {
       try {
-        const response = await api.patch<ApiResponse<BackendEvent>>(`/events/${id}`, {
-          ...(data.name ? { name: data.name } : {}),
-          ...(data.eventType ? { type: data.eventType } : {}),
-          ...(data.startDate ? { start_date: data.startDate } : {}),
-          ...(data.endDate ? { end_date: data.endDate } : {}),
-          ...(data.location ? { description: data.location } : {}),
-          ...(data.capacity !== undefined ? { capacity: data.capacity } : {}),
-          ...(data.status ? { status: mapStatusToBackend(data.status) } : {}),
-        } as EventUpdatePayload);
+        const response = await api.patch<ApiResponse<BackendEvent>>(`/events/${id}`, toEventUpdatePayload(data));
         const updated = normalizeEvent(response.data.data);
         setEvents((prev) => prev.map((e) => (e.id === id ? updated : e)));
         if (useTenantStore.getState().currentEvent?.id === id) {
