@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks';
+import { useAuthStore } from '@/store/authStore';
 import { useTenantStore } from '@/store/tenantStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,6 +89,7 @@ function getPasswordStrength(password: string): PasswordStrength {
 
 export default function Pengaturan() {
   const { user, logout } = useAuth();
+  const setUser = useAuthStore((state) => state.setUser);
   const { currentTenant } = useTenantStore();
   const [activeTab, setActiveTab] = useState<TabKey>('profil');
   const [isSaving, setIsSaving] = useState(false);
@@ -95,9 +97,9 @@ export default function Pengaturan() {
   // Profil state
   const [profileName, setProfileName] = useState(user?.fullName || '');
   const [profileEmail, setProfileEmail] = useState(user?.email || '');
-  const [profilePhone, setProfilePhone] = useState('+62 812-3456-7890');
-  const [profilePosition, setProfilePosition] = useState('Event Manager');
-  const [profileBio, setProfileBio] = useState('');
+  const [profilePhone, setProfilePhone] = useState(user?.phone || '');
+  const [profilePosition, setProfilePosition] = useState(user?.position || '');
+  const [profileBio, setProfileBio] = useState(user?.bio || '');
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -143,6 +145,15 @@ export default function Pengaturan() {
   const passwordsMatch = newPassword === confirmPassword && confirmPassword !== '';
 
   useEffect(() => {
+    if (!user) return;
+    setProfileName(user.fullName || '');
+    setProfileEmail(user.email || '');
+    setProfilePhone(user.phone || '');
+    setProfilePosition(user.position || '');
+    setProfileBio(user.bio || '');
+  }, [user]);
+
+  useEffect(() => {
     if (activeTab !== 'integrasi' || !currentTenant?.id) return;
     let mounted = true;
     void api.get<{ data: WhatsAppIntegrationStatus }>('/integrations/whatsapp')
@@ -160,13 +171,24 @@ export default function Pengaturan() {
   }, [activeTab, currentTenant?.id]);
 
   const handleSaveProfile = async () => {
+    if (!profileName.trim() || !profileEmail.trim()) {
+      toast.error('Nama lengkap dan email wajib diisi');
+      return;
+    }
     setIsSaving(true);
     try {
-      // In a real implementation, call an API to update the profile
-      // await api.patch('/users/me', { fullName: profileName, email: profileEmail, ... });
+      const response = await api.patch<{ user: NonNullable<typeof user> }>('/auth/me', {
+        full_name: profileName.trim(),
+        email: profileEmail.trim(),
+        phone: profilePhone.trim(),
+        position: profilePosition.trim(),
+        bio: profileBio.trim(),
+      });
+      setUser(response.data.user);
       toast.success('Profil berhasil disimpan');
-    } catch {
-      toast.error('Gagal menyimpan profil');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menyimpan profil');
     } finally {
       setIsSaving(false);
     }
@@ -187,14 +209,19 @@ export default function Pengaturan() {
     }
     setIsSaving(true);
     try {
-      // await api.patch('/users/me/password', { currentPassword, newPassword });
-      toast.success('Kata sandi berhasil diperbarui');
+      await api.patch('/auth/me/password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setPasswordExpanded(false);
-    } catch {
-      toast.error('Gagal memperbarui kata sandi');
+      toast.success('Kata sandi berhasil diperbarui. Silakan masuk kembali.');
+      logout();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal memperbarui kata sandi');
     } finally {
       setIsSaving(false);
     }

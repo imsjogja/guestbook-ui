@@ -4,6 +4,9 @@ export interface User {
   id: string;
   email: string;
   fullName: string;
+  phone?: string;
+  position?: string;
+  bio?: string;
   role: 'superadmin' | 'admin' | 'editor' | 'viewer';
   avatar?: string;
   createdAt: string;

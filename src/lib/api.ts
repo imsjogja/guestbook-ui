@@ -83,10 +83,6 @@ function resolveWorkspacePath(url: string, method?: string, data?: unknown) {
       return { url: `${tenantPrefix}/users${query}`, method };
     }
 
-    if (pathname === '/team/invite') {
-      return { url: `${tenantPrefix}/users/invite${query}`, method };
-    }
-
     if (/^\/team\/[^/]+\/role$/.test(pathname)) {
       const memberId = pathname.split('/')[2];
       return { url: `${tenantPrefix}/users/${memberId}/role${query}`, method };

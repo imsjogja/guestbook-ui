@@ -32,7 +32,7 @@ export interface UseTeamReturn {
   isLoading: boolean;
   error: string | null;
   refetch: () => void;
-  inviteMember: (data: { email: string; role: TeamRole }) => Promise<boolean>;
+  addMember: (data: { fullName: string; email: string; password: string; phone?: string; role: TeamRole }) => Promise<boolean>;
   updateRole: (id: string, role: TeamRole) => Promise<boolean>;
   removeMember: (id: string) => Promise<boolean>;
 }
@@ -131,22 +131,25 @@ export function useTeam(): UseTeamReturn {
     fetchMembers();
   }, [fetchMembers]);
 
-  const inviteMember = useCallback(
-    async (data: { email: string; role: TeamRole }): Promise<boolean> => {
+  const addMember = useCallback(
+    async (data: { fullName: string; email: string; password: string; phone?: string; role: TeamRole }): Promise<boolean> => {
       if (!currentTenantId) {
         setError('Tenant belum dipilih');
         return false;
       }
 
       try {
-        await api.post('/team/invite', {
+        await api.post('/team', {
+          full_name: data.fullName,
           email: data.email,
+          password: data.password,
+          ...(data.phone ? { phone: data.phone } : {}),
           role: data.role,
         });
         await fetchMembers();
         return true;
       } catch (err: unknown) {
-        const msg = getApiError(err, 'Gagal mengundang anggota');
+        const msg = getApiError(err, 'Gagal menambahkan anggota');
         setError(msg);
         throw new Error(msg);
       }
@@ -194,5 +197,5 @@ export function useTeam(): UseTeamReturn {
     [currentTenantId, fetchMembers]
   );
 
-  return { members, isLoading, error, refetch: fetchMembers, inviteMember, updateRole, removeMember };
+  return { members, isLoading, error, refetch: fetchMembers, addMember, updateRole, removeMember };
 }

@@ -133,7 +133,7 @@ function getInitials(name?: string | null) {
 }
 
 export default function Tim() {
-  const { members, isLoading, error, refetch, inviteMember, updateRole, removeMember } = useTeam();
+  const { members, isLoading, error, refetch, addMember, updateRole, removeMember } = useTeam();
   const { access, isLoading: isLoadingAccess } = useTenantAccess();
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isRoleManagerOpen, setIsRoleManagerOpen] = useState(false);
@@ -142,7 +142,10 @@ export default function Tim() {
   const [inviteSent, setInviteSent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [memberName, setMemberName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
+  const [memberPhone, setMemberPhone] = useState('');
+  const [memberPassword, setMemberPassword] = useState('');
   const [inviteRole, setInviteRole] = useState<TenantRole>('rsvp_officer');
 
   const canManageTeam = access?.permissions.includes('team:write') ?? false;
@@ -168,29 +171,46 @@ export default function Tim() {
     pending: members.filter((m) => m.status === 'pending').length,
   };
 
-  const handleSendInvite = async () => {
+  const handleAddMember = async () => {
     if (!ensureCanManageTeam()) return;
+    if (!memberName.trim() || memberName.trim().length < 2) {
+      toast.error('Nama anggota minimal 2 karakter');
+      return;
+    }
     if (!inviteEmail.trim() || !inviteEmail.includes('@')) {
       toast.error('Masukkan email yang valid');
       return;
     }
+    if (memberPassword.length < 8) {
+      toast.error('Password minimal 8 karakter');
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const success = await inviteMember({ email: inviteEmail, role: inviteRole });
+      const success = await addMember({
+        fullName: memberName.trim(),
+        email: inviteEmail.trim(),
+        password: memberPassword,
+        phone: memberPhone.trim() || undefined,
+        role: inviteRole,
+      });
       if (success) {
         setInviteSent(true);
-        toast.success('Undangan terkirim');
+        toast.success('Anggota berhasil ditambahkan dan langsung aktif');
         setTimeout(() => {
           setIsInviteOpen(false);
           setInviteSent(false);
+          setMemberName('');
           setInviteEmail('');
+          setMemberPhone('');
+          setMemberPassword('');
           setInviteRole('rsvp_officer');
         }, 2000);
       } else {
-        toast.error('Gagal mengirim undangan');
+        toast.error('Gagal menambahkan anggota');
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal mengirim undangan');
+      toast.error(err instanceof Error ? err.message : 'Gagal menambahkan anggota');
     } finally {
       setIsSubmitting(false);
     }
@@ -287,7 +307,7 @@ export default function Tim() {
             className="h-10 gap-2 bg-[#4f46e5] hover:bg-[#6366f1] text-white"
           >
             <UserPlus size={16} />
-            Undang Anggota
+            Tambah Anggota
           </Button>
         </div>
       </div>
@@ -493,15 +513,15 @@ export default function Tim() {
         </DialogContent>
       </Dialog>
 
-      {/* Invite Modal */}
+      {/* Add member modal */}
       <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
         <DialogContent className="max-w-[480px]">
           <DialogHeader>
             <DialogTitle className="text-[1.25rem] font-semibold text-[#1e293b] dark:text-[#f8fafc]">
-              Undang Anggota Tim
+              Tambah Anggota Tim
             </DialogTitle>
             <DialogDescription className="text-[#64748b]">
-              Kirim undangan bergabung ke tim Anda
+              Buat akun anggota secara manual. Akun langsung aktif dan terverifikasi.
             </DialogDescription>
           </DialogHeader>
 
@@ -518,10 +538,10 @@ export default function Tim() {
                   <CheckCircle2 size={32} className="text-[#059669]" />
                 </div>
                 <h3 className="text-lg font-semibold text-[#1e293b] dark:text-[#f8fafc] mb-1">
-                  Undangan terkirim!
+                  Anggota berhasil ditambahkan!
                 </h3>
                 <p className="text-sm text-[#64748b]">
-                  Undangan telah dikirim ke {inviteEmail}
+                  {inviteEmail} sekarang dapat langsung masuk ke GuestFlow.
                 </p>
               </motion.div>
             ) : (
@@ -533,6 +553,17 @@ export default function Tim() {
                 className="space-y-4 mt-2"
               >
                 <div>
+                  <Label htmlFor="member-name">Nama Lengkap <span className="text-[#f43f5e]">*</span></Label>
+                  <Input
+                    id="member-name"
+                    value={memberName}
+                    onChange={(e) => setMemberName(e.target.value)}
+                    placeholder="Nama anggota"
+                    className="mt-1.5 h-10"
+                  />
+                </div>
+
+                <div>
                   <Label htmlFor="invite-email">Alamat Email <span className="text-[#f43f5e]">*</span></Label>
                   <Input
                     id="invite-email"
@@ -542,6 +573,31 @@ export default function Tim() {
                     placeholder="nama@email.com"
                     className="mt-1.5 h-10"
                   />
+                </div>
+
+                <div>
+                  <Label htmlFor="member-phone">Nomor Telepon</Label>
+                  <Input
+                    id="member-phone"
+                    type="tel"
+                    value={memberPhone}
+                    onChange={(e) => setMemberPhone(e.target.value)}
+                    placeholder="+628123456789"
+                    className="mt-1.5 h-10"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="member-password">Password Awal <span className="text-[#f43f5e]">*</span></Label>
+                  <Input
+                    id="member-password"
+                    type="password"
+                    value={memberPassword}
+                    onChange={(e) => setMemberPassword(e.target.value)}
+                    placeholder="Minimal 8 karakter"
+                    className="mt-1.5 h-10"
+                  />
+                  <p className="text-[11px] text-[#94a3b8] mt-1">Sampaikan password ini kepada anggota secara aman.</p>
                 </div>
 
                 <div>
@@ -590,12 +646,12 @@ export default function Tim() {
                 Batal
               </Button>
               <Button
-                onClick={handleSendInvite}
+                onClick={handleAddMember}
                 disabled={isSubmitting}
                 className="bg-[#4f46e5] hover:bg-[#6366f1] text-white gap-2"
               >
                 {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
-                Kirim Undangan
+                Tambah Anggota
               </Button>
             </DialogFooter>
           )}
