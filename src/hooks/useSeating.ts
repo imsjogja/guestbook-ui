@@ -3,6 +3,25 @@ import api from '@/lib/api';
 import type { Table, ApiResponse } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
 
+type BackendAssignedGuest = {
+  guest_id: string;
+};
+
+type BackendTableWithOccupancy = {
+  id: string;
+  event_id: string;
+  name: string;
+  shape: Table['shape'];
+  capacity: number;
+  position_x?: number | null;
+  position_y?: number | null;
+  assigned_guests?: BackendAssignedGuest[] | null;
+};
+
+type BackendSeatingLayout = {
+  tables?: BackendTableWithOccupancy[] | null;
+};
+
 export interface UseSeatingReturn {
   tables: Table[];
   isLoading: boolean;
@@ -22,6 +41,25 @@ export function useSeating(): UseSeatingReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const normalizeTable = useCallback((table: BackendTableWithOccupancy): Table => {
+    const assignedGuests = Array.isArray(table.assigned_guests)
+      ? table.assigned_guests.map((guest) => guest.guest_id).filter(Boolean)
+      : [];
+
+    return {
+      id: table.id,
+      eventId: table.event_id,
+      name: table.name,
+      shape: table.shape === 'rectangular' || table.shape === 'square' || table.shape === 'round'
+        ? table.shape
+        : 'round',
+      capacity: table.capacity,
+      positionX: typeof table.position_x === 'number' ? table.position_x : 0,
+      positionY: typeof table.position_y === 'number' ? table.position_y : 0,
+      assignedGuests,
+    };
+  }, []);
+
   const fetchTables = useCallback(async () => {
     if (!currentEventId) {
       setTables([]);
@@ -33,15 +71,16 @@ export function useSeating(): UseSeatingReturn {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await api.get<ApiResponse<Table[]>>('/seating');
-      setTables(res.data.data || []);
+      const res = await api.get<ApiResponse<BackendSeatingLayout>>('/seating/layout');
+      const nextTables = (res.data.data?.tables ?? []).map(normalizeTable);
+      setTables(nextTables);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal memuat data seating';
       setError(msg);
     } finally {
       setIsLoading(false);
     }
-  }, [currentEventId]);
+  }, [currentEventId, normalizeTable]);
 
   useEffect(() => {
     fetchTables();
@@ -56,7 +95,10 @@ export function useSeating(): UseSeatingReturn {
 
     try {
       const res = await api.post<ApiResponse<Table>>('/seating', data);
-      const newTable = res.data.data;
+      const newTable: Table = {
+        ...(res.data.data as Table),
+        assignedGuests: [],
+      };
       setTables((prev) => [...prev, newTable]);
       return newTable;
     } catch (err: unknown) {
@@ -64,7 +106,7 @@ export function useSeating(): UseSeatingReturn {
       setError(msg);
       return null;
     }
-  }, []);
+  }, [currentEventId]);
 
   const updateTable = useCallback(async (id: string, data: Partial<Table>): Promise<Table | null> => {
     if (!currentEventId) {
@@ -75,15 +117,28 @@ export function useSeating(): UseSeatingReturn {
 
     try {
       const res = await api.patch<ApiResponse<Table>>(`/seating/${id}`, data);
-      const updated = res.data.data;
-      setTables((prev) => prev.map((t) => (t.id === id ? updated : t)));
-      return updated;
+      const updatedTable = res.data.data as Table;
+      let returnedTable: Table = {
+        ...updatedTable,
+        assignedGuests: [],
+      };
+      setTables((prev) =>
+        prev.map((t) => {
+          if (t.id !== id) return t;
+          returnedTable = {
+            ...updatedTable,
+            assignedGuests: t.assignedGuests ?? [],
+          };
+          return returnedTable;
+        })
+      );
+      return returnedTable;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal memperbarui meja';
       setError(msg);
       return null;
     }
-  }, []);
+  }, [currentEventId]);
 
   const deleteTable = useCallback(async (id: string): Promise<boolean> => {
     if (!currentEventId) {
@@ -101,7 +156,7 @@ export function useSeating(): UseSeatingReturn {
       setError(msg);
       return false;
     }
-  }, []);
+  }, [currentEventId]);
 
   const assignGuest = useCallback(async (tableId: string, guestId: string): Promise<boolean> => {
     if (!currentEventId) {
@@ -114,7 +169,14 @@ export function useSeating(): UseSeatingReturn {
       await api.post(`/seating/${tableId}/assign`, { guest_id: guestId });
       setTables((prev) =>
         prev.map((t) =>
-          t.id === tableId ? { ...t, assignedGuests: [...t.assignedGuests, guestId] } : t
+          t.id === tableId
+            ? {
+                ...t,
+                assignedGuests: (t.assignedGuests ?? []).includes(guestId)
+                  ? (t.assignedGuests ?? [])
+                  : [...(t.assignedGuests ?? []), guestId],
+              }
+            : t
         )
       );
       return true;
@@ -123,7 +185,7 @@ export function useSeating(): UseSeatingReturn {
       setError(msg);
       return false;
     }
-  }, []);
+  }, [currentEventId]);
 
   const unassignGuest = useCallback(async (tableId: string, guestId: string): Promise<boolean> => {
     if (!currentEventId) {
@@ -137,7 +199,7 @@ export function useSeating(): UseSeatingReturn {
       setTables((prev) =>
         prev.map((t) =>
           t.id === tableId
-            ? { ...t, assignedGuests: t.assignedGuests.filter((g) => g !== guestId) }
+            ? { ...t, assignedGuests: (t.assignedGuests ?? []).filter((g) => g !== guestId) }
             : t
         )
       );
@@ -147,7 +209,7 @@ export function useSeating(): UseSeatingReturn {
       setError(msg);
       return false;
     }
-  }, []);
+  }, [currentEventId]);
 
   const autoAssign = useCallback(async (eventId: string): Promise<boolean> => {
     if (!currentEventId) {
@@ -165,7 +227,7 @@ export function useSeating(): UseSeatingReturn {
       setError(msg);
       return false;
     }
-  }, [fetchTables]);
+  }, [currentEventId, fetchTables]);
 
   return { tables, isLoading, error, refetch: fetchTables, createTable, updateTable, deleteTable, assignGuest, unassignGuest, autoAssign };
 }

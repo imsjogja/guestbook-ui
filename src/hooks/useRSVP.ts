@@ -8,6 +8,7 @@ interface ApiRSVP {
   guest_full_name?: string | null;
   event_id: string;
   status: RSVP['status'];
+  attending_pax?: number;
   guest_count?: number;
   guestCount?: number;
   message?: string | null;
@@ -58,7 +59,7 @@ function normalizeRSVP(item: ApiRSVP): RSVP {
     guestName: item.guest_full_name ?? undefined,
     eventId: item.event_id,
     status: item.status,
-    guestCount: asCount(item.guest_count ?? item.guestCount),
+    guestCount: asCount(item.attending_pax ?? item.guest_count ?? item.guestCount),
     message: item.message ?? undefined,
     respondedAt: item.responded_at ?? item.respondedAt ?? undefined,
     respondedVia: item.responded_via ?? item.respondedVia ?? 'manual',
@@ -168,6 +169,31 @@ export function useRSVP(eventId?: string) {
     [eventId]
   );
 
+  const saveRSVPForGuest = useCallback(
+    async (guestId: string, data: Partial<RSVP>) => {
+      if (!eventId) {
+        throw new Error('Event aktif belum dipilih');
+      }
+
+      try {
+        const response = await api.post<{ data: RSVP }>(`/rsvp/by-guest/${guestId}`, toBackendRSVPUpdate(data));
+        const updated = normalizeRSVP(response.data.data as unknown as ApiRSVP);
+        setRsvps((prev) => {
+          const exists = prev.some((r) => r.id === updated.id);
+          if (!exists) {
+            return [updated, ...prev];
+          }
+          return prev.map((r) => (r.id === updated.id ? updated : r));
+        });
+        return updated;
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { data?: { message?: string } } };
+        throw new Error(axiosErr.response?.data?.message ?? 'Gagal menyimpan RSVP');
+      }
+    },
+    [eventId]
+  );
+
   return {
     rsvps,
     breakdown,
@@ -175,5 +201,6 @@ export function useRSVP(eventId?: string) {
     error,
     refetch: fetchRSVPs,
     updateRSVP,
+    saveRSVPForGuest,
   };
 }

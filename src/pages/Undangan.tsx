@@ -37,7 +37,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { useInvitations } from '@/hooks';
+import { useGuests, useInvitations } from '@/hooks';
 import { useTenantStore } from '@/store/tenantStore';
 import { QRCodeSVG } from '@/components/QRCodeSVG';
 import { toast } from 'sonner';
@@ -112,6 +112,7 @@ const statusConfig: Record<
 export default function Undangan() {
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
   const { invitations, isLoading, error, refetch, batchCreate, revokeInvitation, resendInvitation } = useInvitations(currentEventId);
+  const { guests: rosterGuests } = useGuests(currentEventId);
   const [search, setSearch] = useState('');
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -126,6 +127,11 @@ export default function Undangan() {
   const [batchChannel, setBatchChannel] = useState('whatsapp');
 
   const uiInvitations = invitations as UIInvitation[];
+  const invitedGuestIds = useMemo(() => new Set(uiInvitations.map((inv) => inv.guestId)), [uiInvitations]);
+  const batchCandidates = useMemo(
+    () => rosterGuests.filter((guest) => !invitedGuestIds.has(guest.id)),
+    [rosterGuests, invitedGuestIds]
+  );
 
   /* ── Filtering ──────────────────────────────────── */
 
@@ -582,33 +588,31 @@ export default function Undangan() {
               <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc] mb-3">
                 Pilih Penerima
               </p>
-              {uiInvitations.filter((i) => i.status === 'pending').length > 0 ? (
+              {batchCandidates.length > 0 ? (
                 <div className="border border-[#e2e8f0] dark:border-[#334155] rounded-lg overflow-hidden max-h-[280px] overflow-y-auto">
-                  {uiInvitations
-                    .filter((i) => i.status === 'pending')
-                    .map((inv) => (
+                  {batchCandidates.map((guest) => (
                       <label
-                        key={inv.id}
+                        key={guest.id}
                         className="flex items-center gap-3 px-4 py-3 border-b border-[#f1f5f9] dark:border-[#334155] last:border-b-0 hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] cursor-pointer"
                       >
                         <input
                           type="checkbox"
-                          checked={batchGuests.includes(inv.id)}
+                          checked={batchGuests.includes(guest.id)}
                           onChange={(e) => {
                             setBatchGuests((prev) =>
                               e.target.checked
-                                ? [...prev, inv.id]
-                                : prev.filter((id) => id !== inv.id)
+                                ? [...prev, guest.id]
+                                : prev.filter((id) => id !== guest.id)
                             );
                           }}
                           className="rounded border-[#cbd5e1]"
                         />
                         <div className="flex-1">
                           <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">
-                            Tamu {inv.guestId.slice(0, 8)}
+                            {guest.fullName}
                           </p>
                           <p className="text-xs text-[#94a3b8]">
-                            {inv.channel === 'whatsapp' ? 'WhatsApp' : inv.channel === 'email' ? 'Email' : 'Keduanya'}
+                            {guest.phone || guest.email || 'Kontak belum diisi'}
                           </p>
                         </div>
                       </label>

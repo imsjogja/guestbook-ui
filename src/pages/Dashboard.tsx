@@ -230,7 +230,7 @@ export default function Dashboard() {
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
   const [attendanceTab, setAttendanceTab] = useState<'7' | '30' | '90'>('30');
 
-  const { guests: guestsData, isLoading: guestsLoading } = useGuests();
+  const { guests: guestsData, isLoading: guestsLoading } = useGuests(currentEventId);
   const { rsvps, breakdown, isLoading: rsvpLoading } = useRSVP(currentEventId);
   const { checkins, stats, isLoading: checkinLoading } = useCheckin();
   const { events: eventsData, isLoading: eventsLoading } = useEvents();

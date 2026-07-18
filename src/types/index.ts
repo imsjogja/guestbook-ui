@@ -84,6 +84,7 @@ export interface Guest {
   id: string;
   tenantId: string;
   eventId: string;
+  eventGuestId?: string;
   fullName: string;
   email?: string;
   phone?: string;

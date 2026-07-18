@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { normalizeScanToken } from '@/lib/scan-token';
+import { useTenantStore } from '@/store/tenantStore';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -285,7 +286,8 @@ function ManualTab({ onCheckinSuccess }: { onCheckinSuccess: (_name: string) => 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  const { guests, isLoading: guestsLoading } = useGuests();
+  const currentEventId = useTenantStore((s) => s.currentEvent?.id);
+  const { guests, isLoading: guestsLoading } = useGuests(currentEventId);
   const { checkin, walkIn } = useCheckin();
 
   const filteredGuests = searchQuery.length >= 2

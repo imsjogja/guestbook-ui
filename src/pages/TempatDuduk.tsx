@@ -234,8 +234,8 @@ function TableCard({
 
 export default function TempatDuduk() {
   const { tables, isLoading, error, refetch, createTable, assignGuest, unassignGuest, autoAssign } = useSeating();
-  const { guests } = useGuests();
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
+  const { guests } = useGuests(currentEventId);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -257,7 +257,8 @@ export default function TempatDuduk() {
   const assignments = useMemo(() => {
     const map: Record<string, import('@/types').Guest[]> = {};
     for (const table of tables) {
-      map[table.id] = table.assignedGuests
+      const assignedGuests = Array.isArray(table.assignedGuests) ? table.assignedGuests : [];
+      map[table.id] = assignedGuests
         .map(guestId => guests.find(g => g.id === guestId))
         .filter((g): g is import('@/types').Guest => !!g);
     }
@@ -268,7 +269,8 @@ export default function TempatDuduk() {
   const assignedGuestIds = useMemo(() => {
     const ids = new Set<string>();
     for (const table of tables) {
-      for (const guestId of table.assignedGuests) {
+      const assignedGuests = Array.isArray(table.assignedGuests) ? table.assignedGuests : [];
+      for (const guestId of assignedGuests) {
         ids.add(guestId);
       }
     }
@@ -326,13 +328,11 @@ export default function TempatDuduk() {
   const handleAutoAssignClick = async () => {
     setIsAutoAssigning(true);
     try {
-      // Use the first eventId from tables if available, or empty string
-      const eventId = tables[0]?.eventId || '';
-      if (!eventId) {
+      if (!currentEventId) {
         toast.error('Tidak ada acara yang tersedia');
         return;
       }
-      const success = await autoAssign(eventId);
+      const success = await autoAssign(currentEventId);
       if (success) {
         toast.success('Penempatan otomatis berhasil diterapkan');
       }
@@ -390,17 +390,22 @@ export default function TempatDuduk() {
     }
   };
 
-  const handleReset = () => {
-    // Reset: unassign all guests from the selected table
-    if (selectedTableId) {
-      const tableGuests = assignments[selectedTableId] || [];
-      tableGuests.forEach(g => {
-        unassignGuest(selectedTableId, g.id);
-      });
+  const handleReset = async () => {
+    if (!selectedTableId) {
+      setShowResetConfirm(false);
+      return;
     }
-    setShowResetConfirm(false);
-    setSelectedTableId(null);
-    toast.success('Meja telah dikosongkan');
+
+    try {
+      const tableGuests = assignments[selectedTableId] || [];
+      await Promise.all(tableGuests.map((g) => unassignGuest(selectedTableId, g.id)));
+      toast.success('Meja telah dikosongkan');
+    } catch {
+      toast.error('Gagal mengosongkan meja');
+    } finally {
+      setShowResetConfirm(false);
+      setSelectedTableId(null);
+    }
   };
 
   if (error) {

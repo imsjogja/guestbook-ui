@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
-import { bootstrapWorkspace } from '@/lib/workspace';
 import type { AuthResponse, LoginRequest, RegisterRequest } from '@/types';
 
 function assertAuthResponse(response: AuthResponse) {
@@ -23,7 +22,6 @@ export function useAuth() {
     async (data: LoginRequest) => {
       setIsLoading(true);
       setError(null);
-      let sessionStarted = false;
       try {
         const response = await api.post<AuthResponse>('/auth/login', {
           email: data.email,
@@ -32,15 +30,15 @@ export function useAuth() {
         assertAuthResponse(response.data);
         const { access_token, user: userData } = response.data;
         storeLogin(access_token, userData);
-        sessionStarted = true;
-        await bootstrapWorkspace({ reset: true, requireTenant: false, requireEvent: false });
         return response.data;
       } catch (err: unknown) {
-        if (sessionStarted) {
-          storeLogout();
-        }
         const axiosErr = err as { response?: { data?: { message?: string; error?: string } } };
-        const msg = axiosErr.response?.data?.message ?? axiosErr.response?.data?.error ?? (err instanceof Error ? err.message : 'Email atau kata sandi salah');
+        const isNetworkError =
+          !axiosErr.response ||
+          (err instanceof Error && err.message === 'Network Error');
+        const msg = isNetworkError
+          ? 'Tidak dapat terhubung ke server. Pastikan backend Docker aktif.'
+          : axiosErr.response?.data?.message ?? axiosErr.response?.data?.error ?? (err instanceof Error ? err.message : 'Email atau kata sandi salah');
         setError(msg);
         throw new Error(msg);
       } finally {
@@ -54,7 +52,6 @@ export function useAuth() {
     async (data: RegisterRequest) => {
       setIsLoading(true);
       setError(null);
-      let sessionStarted = false;
       try {
         const response = await api.post<AuthResponse>('/auth/register', {
           full_name: data.fullName,
@@ -65,14 +62,12 @@ export function useAuth() {
         assertAuthResponse(response.data);
         const { access_token, user: userData } = response.data;
         storeLogin(access_token, userData);
-        sessionStarted = true;
-        await bootstrapWorkspace({ reset: true, requireTenant: false, requireEvent: false });
         return response.data;
       } catch (err: unknown) {
-        if (sessionStarted) {
-          storeLogout();
-        }
         const axiosErr = err as { response?: { data?: { message?: string; error?: string; errors?: Record<string, string[]> } } };
+        const isNetworkError =
+          !axiosErr.response ||
+          (err instanceof Error && err.message === 'Network Error');
         const msg = axiosErr.response?.data?.message;
         const errors = axiosErr.response?.data?.errors;
         const fallback = axiosErr.response?.data?.error ?? (err instanceof Error ? err.message : undefined);
@@ -80,6 +75,8 @@ export function useAuth() {
         if (errors) {
           const firstError = Object.values(errors)[0]?.[0];
           errorMsg = firstError ?? msg ?? fallback ?? 'Registrasi gagal';
+        } else if (isNetworkError) {
+          errorMsg = 'Tidak dapat terhubung ke server. Pastikan backend Docker aktif.';
         } else {
           errorMsg = msg ?? fallback ?? 'Registrasi gagal. Silakan coba lagi.';
         }

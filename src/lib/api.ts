@@ -73,6 +73,12 @@ function resolveWorkspacePath(url: string, method?: string, data?: unknown) {
     return { url: `${tenantPrefix}${pathname}${query}`, method };
   }
 
+  if (pathname === '/event-guests' || pathname.startsWith('/event-guests/')) {
+    if (!eventPrefix) return { url, method };
+    const rosterPath = pathname.replace(/^\/event-guests/, '/guests');
+    return { url: `${eventPrefix}${rosterPath}${query}`, method };
+  }
+
   if (pathname === '/templates' || pathname.startsWith('/templates/')) {
     return { url: `${tenantPrefix}${pathname}${query}`, method };
   }
@@ -141,6 +147,11 @@ function resolveWorkspacePath(url: string, method?: string, data?: unknown) {
   if (pathname === '/seating') {
     if (!eventPrefix) return { url, method };
     return { url: `${eventPrefix}/tables${query}`, method };
+  }
+
+  if (pathname === '/seating/layout') {
+    if (!eventPrefix) return { url, method };
+    return { url: `${eventPrefix}/seating/layout${query}`, method };
   }
 
   if (pathname.startsWith('/seating/auto-assign')) {

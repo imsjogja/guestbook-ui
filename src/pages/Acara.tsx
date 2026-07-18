@@ -20,6 +20,7 @@ import { id } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useEvents } from '@/hooks/useEvents';
 import type { Event } from '@/types';
+import { useTenantStore } from '@/store/tenantStore';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -60,6 +61,7 @@ function SkeletonRow() {
 /* ─── Component ─── */
 export default function Acara() {
   const navigate = useNavigate();
+  const setCurrentEvent = useTenantStore((state) => state.setCurrentEvent);
   const { events, isLoading, error, createEvent, updateEvent, deleteEvent } = useEvents();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -73,6 +75,11 @@ export default function Acara() {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const openEventGuests = (event: Event) => {
+    setCurrentEvent(event);
+    navigate(`/tamu?event=${event.id}`);
+  };
 
   /* Form state */
   const [formName, setFormName] = useState('');
@@ -463,7 +470,7 @@ export default function Acara() {
                               <div className="flex items-center gap-1.5 text-sm text-[#64748b]">
                                 <Users size={13} />
                                 <button
-                                  onClick={() => navigate(`/tamu?event=${evt.id}`)}
+                                  onClick={() => openEventGuests(evt)}
                                   className="hover:text-[#4f46e5] hover:underline transition-colors"
                                 >
                                   0
@@ -490,7 +497,7 @@ export default function Acara() {
                                 <Pencil size={15} />
                               </button>
                               <button
-                                onClick={() => navigate(`/tamu?event=${evt.id}`)}
+                                onClick={() => openEventGuests(evt)}
                                 className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors"
                                 title="Lihat Tamu"
                               >

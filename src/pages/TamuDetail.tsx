@@ -99,7 +99,7 @@ export default function TamuDetail() {
   const [activeTab, setActiveTab] = useState('ringkasan');
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
   const { invitations, createInvitation } = useInvitations(currentEventId);
-  const { rsvps, updateRSVP } = useRSVP(currentEventId);
+  const { rsvps, saveRSVPForGuest } = useRSVP(currentEventId);
   const [showRsvpEdit, setShowRsvpEdit] = useState(false);
   const [selectedRsvpStatus, setSelectedRsvpStatus] = useState<EditableRSVPStatus>('attending');
   const [isSavingRsvp, setIsSavingRsvp] = useState(false);
@@ -125,18 +125,26 @@ export default function TamuDetail() {
   };
 
   const handleSaveRsvp = async () => {
-    if (!rsvpRecord) {
-      toast.error('RSVP belum tersedia untuk tamu ini');
+    if (!guest) {
+      toast.error('Data tamu belum siap');
       return;
     }
 
     setIsSavingRsvp(true);
     try {
-      await updateRSVP(rsvpRecord.id, {
+      let activeInvitation = invitation;
+      if (!activeInvitation) {
+        activeInvitation = await createInvitation({ guestId: guest.id });
+        if (!activeInvitation) {
+          throw new Error('Gagal menyiapkan undangan untuk RSVP');
+        }
+      }
+
+      const saved = await saveRSVPForGuest(guest.id, {
         status: selectedRsvpStatus,
-        guestCount: selectedRsvpStatus === 'not_attending' ? 0 : rsvpRecord.guestCount || 1,
+        guestCount: selectedRsvpStatus === 'not_attending' ? 0 : rsvpRecord?.guestCount || 1,
       });
-      toast.success('Status RSVP diperbarui');
+      toast.success(saved ? 'Status RSVP disimpan' : 'Status RSVP diperbarui');
       setShowRsvpEdit(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal memperbarui RSVP';

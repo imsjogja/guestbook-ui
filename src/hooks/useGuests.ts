@@ -54,6 +54,30 @@ type PaginatedBackendGuestResponse = {
   };
 };
 
+type BackendEventGuestResponse = {
+  id: string;
+  event_id: string;
+  guest_id: string;
+  status: string;
+  max_pax?: number;
+  plus_one_allowed?: boolean;
+  guest: BackendGuest;
+};
+
+type PaginatedBackendEventGuestResponse = {
+  data: BackendEventGuestResponse[];
+  meta?: PaginatedBackendGuestResponse['meta'];
+};
+
+function normalizeEventGuest(item: BackendEventGuestResponse): Guest {
+  return {
+    ...normalizeGuest(item.guest),
+    eventId: item.event_id,
+    eventGuestId: item.id,
+    plusOne: item.plus_one_allowed ?? false,
+  };
+}
+
 function mapUiCategoryToGuestType(category?: Guest['category'] | string): string {
   switch (category) {
     case 'vip':
@@ -98,9 +122,13 @@ export function useGuests(eventId?: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const params = eventId ? { eventId } : {};
-      const response = await api.get<PaginatedBackendGuestResponse>('/guests', { params });
-      const normalized = (response.data.data ?? []).map(normalizeGuest);
+      const params = eventId ? { status: 'active' } : {};
+      const response = eventId
+        ? await api.get<PaginatedBackendEventGuestResponse>('/event-guests', { params })
+        : await api.get<PaginatedBackendGuestResponse>('/guests', { params });
+      const normalized: Guest[] = eventId
+        ? (response.data as PaginatedBackendEventGuestResponse).data.map(normalizeEventGuest)
+        : (response.data as PaginatedBackendGuestResponse).data.map(normalizeGuest);
       setGuests(normalized);
       setTotal(response.data.meta?.total ?? normalized.length);
     } catch (err: unknown) {
@@ -120,7 +148,15 @@ export function useGuests(eventId?: string) {
     async (data: Partial<Guest>) => {
       try {
         const response = await api.post<{ data: BackendGuest }>('/guests', buildGuestPayload(data));
-        const newGuest = normalizeGuest(response.data.data);
+        const masterGuest = normalizeGuest(response.data.data);
+        const newGuest = eventId
+          ? normalizeEventGuest((await api.post<{ data: BackendEventGuestResponse }>('/event-guests', {
+              guest_id: masterGuest.id,
+              source: 'manual',
+              max_pax: 1,
+              adults: 1,
+            })).data.data)
+          : masterGuest;
         setGuests((prev) => [newGuest, ...prev]);
         setTotal((prev) => prev + 1);
         return newGuest;
@@ -129,7 +165,7 @@ export function useGuests(eventId?: string) {
         throw new Error(axiosErr.response?.data?.message ?? 'Gagal menambah tamu');
       }
     },
-    []
+    [eventId]
   );
 
   const updateGuest = useCallback(
@@ -137,20 +173,24 @@ export function useGuests(eventId?: string) {
       try {
         const response = await api.put<{ data: BackendGuest }>(`/guests/${id}`, buildGuestPayload(data));
         const updated = normalizeGuest(response.data.data);
-        setGuests((prev) => prev.map((g) => (g.id === id ? updated : g)));
-        return updated;
+        const existing = guests.find((guest) => guest.id === id);
+        const result = existing
+          ? { ...updated, eventId: existing.eventId, eventGuestId: existing.eventGuestId }
+          : updated;
+        setGuests((prev) => prev.map((g) => (g.id === id ? result : g)));
+        return result;
       } catch (err: unknown) {
         const axiosErr = err as { response?: { data?: { message?: string } } };
         throw new Error(axiosErr.response?.data?.message ?? 'Gagal memperbarui tamu');
       }
     },
-    []
+    [eventId, guests]
   );
 
   const deleteGuest = useCallback(
     async (id: string) => {
       try {
-        await api.delete(`/guests/${id}`);
+        await api.delete(eventId ? `/event-guests/${guests.find((guest) => guest.id === id)?.eventGuestId ?? id}` : `/guests/${id}`);
         setGuests((prev) => prev.filter((g) => g.id !== id));
         setTotal((prev) => Math.max(0, prev - 1));
       } catch (err: unknown) {
@@ -158,7 +198,7 @@ export function useGuests(eventId?: string) {
         throw new Error(axiosErr.response?.data?.message ?? 'Gagal menghapus tamu');
       }
     },
-    []
+    [eventId, guests]
   );
 
   const importCSV = useCallback(
@@ -167,7 +207,7 @@ export function useGuests(eventId?: string) {
         const formData = new FormData();
         formData.append('file', file);
         if (eventId) formData.append('eventId', eventId);
-        const response = await api.post<{ data: { imported: number } }>('/guests/import', formData, {
+        const response = await api.post<{ data: { imported: number } }>(eventId ? '/event-guests/import' : '/guests/import', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         await fetchGuests();
@@ -198,10 +238,16 @@ export function useGuests(eventId?: string) {
       const allGuests: Guest[] = [];
 
       while (page <= totalPages) {
-        const response = await api.get<PaginatedBackendGuestResponse>('/guests', {
+        const response = eventId
+          ? await api.get<PaginatedBackendEventGuestResponse>('/event-guests', {
+              params: { page, per_page: perPage, status: 'active' },
+            })
+          : await api.get<PaginatedBackendGuestResponse>('/guests', {
           params: { page, per_page: perPage },
-        });
-        const pageGuests = (response.data.data ?? []).map(normalizeGuest);
+            });
+        const pageGuests: Guest[] = eventId
+          ? (response.data as PaginatedBackendEventGuestResponse).data.map(normalizeEventGuest)
+          : (response.data as PaginatedBackendGuestResponse).data.map(normalizeGuest);
         allGuests.push(...pageGuests);
         totalPages = response.data.meta?.total_pages ?? (pageGuests.length < perPage ? page : page + 1);
         if (response.data.meta?.current_page !== undefined && response.data.meta.current_page >= totalPages) {
@@ -217,7 +263,7 @@ export function useGuests(eventId?: string) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       throw new Error(axiosErr.response?.data?.message ?? 'Gagal mengekspor CSV');
     }
-  }, []);
+  }, [eventId]);
 
   return {
     guests,

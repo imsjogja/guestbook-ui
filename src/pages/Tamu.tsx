@@ -23,6 +23,7 @@ import { getGuestInitials } from '@/lib/normalizers';
 import { useGuests } from '@/hooks/useGuests';
 import type { Guest } from '@/types';
 import { toast } from 'sonner';
+import { useTenantStore } from '@/store/tenantStore';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -74,6 +75,7 @@ function SkeletonRow() {
 /* ─── Component ─── */
 export default function Tamu() {
   const navigate = useNavigate();
+  const currentEventId = useTenantStore((state) => state.currentEvent?.id);
   const {
     guests,
     total,
@@ -85,7 +87,7 @@ export default function Tamu() {
     importCSV,
     downloadTemplateCSV,
     exportGuestsCSV,
-  } = useGuests();
+  } = useGuests(currentEventId);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [segmentFilter, setSegmentFilter] = useState<string>('all');
