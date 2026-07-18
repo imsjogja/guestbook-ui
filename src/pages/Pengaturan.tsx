@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import api from '@/lib/api';
 
 
 
@@ -59,6 +60,18 @@ interface PasswordStrength {
   score: number;
   label: string;
   color: string;
+}
+
+interface WhatsAppIntegrationStatus {
+  enabled: boolean;
+  configured: boolean;
+  api_url: string;
+  account_token_set: boolean;
+  account_token_masked?: string;
+  sender_token_set: boolean;
+  sender_token_masked?: string;
+  source: 'tenant' | 'environment';
+  updated_at?: string;
 }
 
 function getPasswordStrength(password: string): PasswordStrength {
@@ -117,8 +130,34 @@ export default function Pengaturan() {
   const [notifSound, setNotifSound] = useState(false);
   const [notifBrowser, setNotifBrowser] = useState(false);
 
+  // WhatsApp integration state. Token inputs are write-only and are cleared
+  // after save; the API returns only masked status values.
+  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
+  const [whatsappAccountToken, setWhatsappAccountToken] = useState('');
+  const [whatsappSenderToken, setWhatsappSenderToken] = useState('');
+  const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppIntegrationStatus | null>(null);
+  const [showWhatsAppAccountToken, setShowWhatsAppAccountToken] = useState(false);
+  const [showWhatsAppSenderToken, setShowWhatsAppSenderToken] = useState(false);
+
   const passwordStrength = getPasswordStrength(newPassword);
   const passwordsMatch = newPassword === confirmPassword && confirmPassword !== '';
+
+  useEffect(() => {
+    if (activeTab !== 'integrasi' || !currentTenant?.id) return;
+    let mounted = true;
+    void api.get<{ data: WhatsAppIntegrationStatus }>('/integrations/whatsapp')
+      .then((response) => {
+        if (!mounted) return;
+        setWhatsappStatus(response.data.data);
+        setWhatsappEnabled(response.data.data.enabled);
+      })
+      .catch(() => {
+        if (mounted) setWhatsappStatus(null);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [activeTab, currentTenant?.id]);
 
   const handleSaveProfile = async () => {
     setIsSaving(true);
@@ -180,6 +219,26 @@ export default function Pengaturan() {
       toast.success('Preferensi notifikasi berhasil disimpan');
     } catch {
       toast.error('Gagal menyimpan preferensi notifikasi');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveWhatsApp = async () => {
+    setIsSaving(true);
+    try {
+      const response = await api.patch<{ data: WhatsAppIntegrationStatus }>('/integrations/whatsapp', {
+        enabled: whatsappEnabled,
+        ...(whatsappAccountToken.trim() ? { account_token: whatsappAccountToken.trim() } : {}),
+        ...(whatsappSenderToken.trim() ? { sender_token: whatsappSenderToken.trim() } : {}),
+      });
+      setWhatsappStatus(response.data.data);
+      setWhatsappAccountToken('');
+      setWhatsappSenderToken('');
+      toast.success('Kredensial WhatsApp disimpan dan langsung diterapkan');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menyimpan kredensial WhatsApp');
     } finally {
       setIsSaving(false);
     }
@@ -816,33 +875,99 @@ export default function Pengaturan() {
                 className="space-y-6"
               >
                 <div className="bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl p-6">
-                  <h2 className="text-[1.125rem] font-semibold text-[#1e293b] dark:text-[#f8fafc] mb-4">Koneksi Layanan</h2>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-[#f8fafc] dark:bg-[#1e293b] rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#10b981]">
-                          <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
-                        </svg>
-                        <div>
-                          <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">WhatsApp Business</p>
-                          <p className="text-[11px] text-[#10b981]">Terhubung — +62 812-3456-7890</p>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm" className="border-[#e2e8f0] text-[#f43f5e]">
-                        Putuskan
-                      </Button>
+                  <div className="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                      <h2 className="text-[1.125rem] font-semibold text-[#1e293b] dark:text-[#f8fafc]">WhatsApp Business</h2>
+                      <p className="text-xs text-[#64748b] mt-1">Konfigurasi Blastr untuk pengiriman undangan WhatsApp.</p>
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-[#f8fafc] dark:bg-[#1e293b] rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Mail size={20} className="text-[#3b82f6]" />
-                        <div>
-                          <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">Email SMTP</p>
-                          <p className="text-[11px] text-[#10b981]">Terhubung</p>
-                        </div>
+                    <span className={cn(
+                      'inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium border',
+                      whatsappStatus?.configured
+                        ? 'bg-[#d1fae5] text-[#065f46] border-[#10b981]/30'
+                        : 'bg-[#fef3c7] text-[#92400e] border-[#f59e0b]/30'
+                    )}>
+                      {whatsappStatus?.configured ? 'Siap digunakan' : 'Belum lengkap'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between rounded-lg bg-[#f8fafc] dark:bg-[#1e293b] p-3">
+                      <div>
+                        <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">Aktifkan pengiriman WhatsApp</p>
+                        <p className="text-[11px] text-[#94a3b8]">Perubahan langsung diterapkan tanpa restart container.</p>
                       </div>
-                      <Button variant="outline" size="sm" className="border-[#e2e8f0] text-[#64748b]">
-                        Pengaturan
-                      </Button>
+                      <Switch checked={whatsappEnabled} onCheckedChange={setWhatsappEnabled} className="data-[state=checked]:bg-[#10b981]" />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="whatsapp-account-token">WHATSAPP_ACCOUNT_TOKEN</Label>
+                      <div className="relative mt-1.5">
+                        <Input
+                          id="whatsapp-account-token"
+                          type={showWhatsAppAccountToken ? 'text' : 'password'}
+                          value={whatsappAccountToken}
+                          onChange={(event) => setWhatsappAccountToken(event.target.value)}
+                          placeholder={whatsappStatus?.account_token_masked || 'Masukkan account token baru'}
+                          autoComplete="new-password"
+                          className="h-10 pr-10 font-mono text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowWhatsAppAccountToken((value) => !value)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8]"
+                          aria-label={showWhatsAppAccountToken ? 'Sembunyikan account token' : 'Tampilkan account token'}
+                        >
+                          {showWhatsAppAccountToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-[#94a3b8] mt-1">Kosongkan jika tidak ingin mengganti token yang tersimpan.</p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="whatsapp-sender-token">WHATSAPP_SENDER_TOKEN</Label>
+                      <div className="relative mt-1.5">
+                        <Input
+                          id="whatsapp-sender-token"
+                          type={showWhatsAppSenderToken ? 'text' : 'password'}
+                          value={whatsappSenderToken}
+                          onChange={(event) => setWhatsappSenderToken(event.target.value)}
+                          placeholder={whatsappStatus?.sender_token_masked || 'Masukkan sender token baru'}
+                          autoComplete="new-password"
+                          className="h-10 pr-10 font-mono text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowWhatsAppSenderToken((value) => !value)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8]"
+                          aria-label={showWhatsAppSenderToken ? 'Sembunyikan sender token' : 'Tampilkan sender token'}
+                        >
+                          {showWhatsAppSenderToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-[#94a3b8] mt-1">Token hanya ditampilkan saat sedang diisi dan tidak pernah dikembalikan API.</p>
+                    </div>
+
+                    <div className="rounded-lg border border-[#e2e8f0] dark:border-[#334155] p-3 text-xs text-[#64748b]">
+                      Sumber konfigurasi: <span className="font-medium text-[#1e293b] dark:text-[#f8fafc]">{whatsappStatus?.source === 'tenant' ? 'Pengaturan tenant' : 'Environment server'}</span>.
+                      {whatsappStatus?.source === 'environment' && ' Menyimpan token di sini akan membuat konfigurasi tenant ini menjadi prioritas.'}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end mt-5">
+                    <Button onClick={handleSaveWhatsApp} disabled={isSaving} className="bg-[#4f46e5] hover:bg-[#6366f1] text-white">
+                      {isSaving ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
+                      Simpan & Terapkan
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl p-6">
+                  <h2 className="text-[1.125rem] font-semibold text-[#1e293b] dark:text-[#f8fafc] mb-4">Koneksi Layanan Lain</h2>
+                  <div className="flex items-center gap-3 p-3 bg-[#f8fafc] dark:bg-[#1e293b] rounded-lg">
+                    <Mail size={20} className="text-[#3b82f6]" />
+                    <div>
+                      <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">Email SMTP</p>
+                      <p className="text-[11px] text-[#10b981]">Status mengikuti konfigurasi environment server</p>
                     </div>
                   </div>
                 </div>
@@ -942,4 +1067,3 @@ export default function Pengaturan() {
     </div>
   );
 }
-

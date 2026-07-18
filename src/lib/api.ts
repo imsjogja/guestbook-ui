@@ -113,6 +113,10 @@ function resolveWorkspacePath(url: string, method?: string, data?: unknown) {
     return { url: `${tenantPrefix}/access${query}`, method };
   }
 
+  if (pathname === '/integrations/whatsapp') {
+    return { url: `${tenantPrefix}/integrations/whatsapp${query}`, method };
+  }
+
   if (pathname === '/events' || pathname.startsWith('/events/')) {
     if (pathname.endsWith('/publish') && lowerMethod === 'patch') {
       return { url: `${tenantPrefix}${pathname}${query}`, method: 'post' };
