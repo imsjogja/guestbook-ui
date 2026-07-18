@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
-  Download,
   Pencil,
   Trash2,
   Eye,
@@ -42,16 +41,16 @@ import { toast } from 'sonner';
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 const availableVariables = [
-  { key: '{{nama_tamu}}', label: 'Nama Tamu' },
-  { key: '{{nama_depan}}', label: 'Nama Depan' },
-  { key: '{{nama_acara}}', label: 'Nama Acara' },
-  { key: '{{tanggal_acara}}', label: 'Tanggal Acara' },
-  { key: '{{waktu_acara}}', label: 'Waktu Acara' },
-  { key: '{{lokasi}}', label: 'Lokasi' },
-  { key: '{{alamat}}', label: 'Alamat' },
-  { key: '{{qr_code}}', label: 'QR Code' },
-  { key: '{{link_rsvp}}', label: 'Link RSVP' },
-  { key: '{{nama_pengirim}}', label: 'Nama Pengirim' },
+  { key: '{{guest_name}}', label: 'Nama Tamu' },
+  { key: '{{event_name}}', label: 'Nama Acara' },
+  { key: '{{event_date}}', label: 'Tanggal Acara' },
+  { key: '{{event_time}}', label: 'Waktu Acara' },
+  { key: '{{rsvp_link}}', label: 'Link RSVP' },
+  { key: '{{guest_type}}', label: 'Tipe Tamu' },
+  { key: '{{guest_phone}}', label: 'Nomor WhatsApp' },
+  { key: '{{guest_email}}', label: 'Email Tamu' },
+  { key: '{{dress_code}}', label: 'Dress Code' },
+  { key: '{{invitation_url}}', label: 'Link Undangan' },
 ];
 
 function highlightVariables(text: string) {
@@ -72,7 +71,7 @@ function highlightVariables(text: string) {
 }
 
 export default function TemplateKomunikasi() {
-  const { templates, isLoading, error, refetch, createTemplate, updateTemplate, deleteTemplate } = useTemplates();
+  const { templates, isLoading, error, refetch, createTemplate, updateTemplate, deleteTemplate, generateDefaultTemplates } = useTemplates();
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -80,6 +79,7 @@ export default function TemplateKomunikasi() {
   const [editingTemplate, setEditingTemplate] = useState<import('@/types').Template | null>(null);
   const [showVarDropdown, setShowVarDropdown] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingDefaults, setIsGeneratingDefaults] = useState(false);
 
   const [formName, setFormName] = useState('');
   const [formChannel, setFormChannel] = useState<'whatsapp' | 'email'>('whatsapp');
@@ -115,6 +115,17 @@ export default function TemplateKomunikasi() {
   const openPreview = (t: import('@/types').Template) => {
     setPreviewTemplate(t);
     setIsPreviewOpen(true);
+  };
+
+  const handleGenerateDefaults = async () => {
+    setIsGeneratingDefaults(true);
+    const generated = await generateDefaultTemplates();
+    setIsGeneratingDefaults(false);
+    if (generated.length > 0) {
+      toast.success('Template default WhatsApp dan email siap digunakan');
+    } else {
+      toast.error('Gagal membuat template default');
+    }
   };
 
   const handleSave = async () => {
@@ -227,10 +238,12 @@ export default function TemplateKomunikasi() {
           <Button
             variant="outline"
             size="sm"
+            onClick={handleGenerateDefaults}
+            disabled={isGeneratingDefaults}
             className="h-10 gap-2 border-[#e2e8f0] text-[#64748b] hover:text-[#1e293b]"
           >
-            <Download size={16} />
-            <span className="hidden sm:inline">Ekspor</span>
+            {isGeneratingDefaults ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+            <span className="hidden sm:inline">{isGeneratingDefaults ? 'Menyiapkan...' : 'Buat Default'}</span>
           </Button>
           <Button
             onClick={openCreate}

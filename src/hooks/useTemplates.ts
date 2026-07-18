@@ -35,6 +35,7 @@ export interface UseTemplatesReturn {
   createTemplate: (data: Partial<Template>) => Promise<Template | null>;
   updateTemplate: (id: string, data: Partial<Template>) => Promise<Template | null>;
   deleteTemplate: (id: string) => Promise<boolean>;
+  generateDefaultTemplates: () => Promise<Template[]>;
 }
 
 export function useTemplates(): UseTemplatesReturn {
@@ -98,5 +99,18 @@ export function useTemplates(): UseTemplatesReturn {
     }
   }, []);
 
-  return { templates, isLoading, error, refetch: fetchTemplates, createTemplate, updateTemplate, deleteTemplate };
+  const generateDefaultTemplates = useCallback(async (): Promise<Template[]> => {
+    try {
+      const res = await api.post<ApiResponse<BackendTemplate[]>>('/templates/defaults');
+      const generated = (res.data.data || []).map(normalizeTemplate);
+      setTemplates(generated);
+      return generated;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal membuat template default';
+      setError(msg);
+      return [];
+    }
+  }, []);
+
+  return { templates, isLoading, error, refetch: fetchTemplates, createTemplate, updateTemplate, deleteTemplate, generateDefaultTemplates };
 }
