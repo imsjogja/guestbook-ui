@@ -29,9 +29,8 @@ function App() {
       <Route path="/register" element={<Register />} />
 
       {/* App routes — with sidebar layout */}
-      <Route element={<AuthenticatedLayout />}>
+        <Route element={<AuthenticatedLayout />}>
         <Route path="acara" element={<Acara />} />
-        <Route path="kelompok-keluarga" element={<KelompokKeluarga />} />
         <Route path="komunikasi/template" element={<TemplateKomunikasi />} />
         <Route path="tim" element={<Tim />} />
         <Route path="pengaturan" element={<Pengaturan />} />
@@ -40,6 +39,7 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="tamu" element={<Tamu />} />
           <Route path="tamu/:id" element={<TamuDetail />} />
+          <Route path="kelompok-keluarga" element={<KelompokKeluarga />} />
           <Route path="undangan" element={<Undangan />} />
           <Route path="rsvp" element={<RSVPPage />} />
           <Route path="check-in" element={<Checkin />} />

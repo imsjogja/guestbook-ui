@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { getGuestFirstName, getGuestInitials } from '@/lib/normalizers';
 import { useGuests } from '@/hooks';
 import type { Guest } from '@/types';
+import { useTenantStore } from '@/store/tenantStore';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -64,7 +65,9 @@ const rsvpDot: Record<string, string> = {
 
 /* ─── Component ─── */
 export default function KelompokKeluarga() {
-  const { guests, isLoading, error, refetch, createGuest } = useGuests();
+  const currentEvent = useTenantStore((state) => state.currentEvent);
+  const currentEventId = currentEvent?.id;
+  const { guests, isLoading, error, refetch, createGuest } = useGuests(currentEventId);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
@@ -73,7 +76,6 @@ export default function KelompokKeluarga() {
 
   /* Form state */
   const [formName, setFormName] = useState('');
-  const [formEvent, setFormEvent] = useState('Pernikahan Aditya & Putri');
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberType, setNewMemberType] = useState('Anggota');
 
@@ -97,7 +99,7 @@ export default function KelompokKeluarga() {
           result.push({
             id: `individual-${g.id}`,
             name: g.fullName,
-            eventName: formEvent,
+            eventName: currentEvent?.name ?? 'Acara aktif',
             members: [mapGuestToMember(g)],
           });
         });
@@ -106,14 +108,14 @@ export default function KelompokKeluarga() {
         result.push({
           id: hhId,
           name: firstMember.subgroup || `Keluarga ${getGuestFirstName(firstMember.fullName)}`,
-          eventName: formEvent,
+          eventName: currentEvent?.name ?? 'Acara aktif',
           members: members.map(mapGuestToMember),
         });
       }
     });
 
     return result;
-  }, [guests, formEvent]);
+  }, [currentEvent?.name, guests]);
 
   /* Filtered */
   const filtered = households.filter((h) =>
@@ -139,7 +141,7 @@ export default function KelompokKeluarga() {
     await createGuest({
       fullName: formName,
       subgroup: formName,
-      eventId: '', // Will be set by backend
+      eventId: currentEventId ?? '',
       category: 'family',
       plusOne: false,
     });
@@ -472,13 +474,10 @@ export default function KelompokKeluarga() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-[#64748b] mb-1">Acara <span className="text-[#f43f5e]">*</span></label>
-                  <select value={formEvent} onChange={(e) => setFormEvent(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20">
-                    <option>Pernikahan Aditya & Putri</option>
-                    <option>Konferensi Teknologi 2025</option>
-                    <option>Ulang Tahun Bapak Suryadi</option>
-                    <option>Grand Opening Kafe Nusantara</option>
-                  </select>
+                  <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-[#c7d2fe] bg-[#eef2ff] px-3 text-sm text-[#3730a3]">
+                    <span className="truncate font-medium">{currentEvent?.name ?? 'Acara aktif'}</span>
+                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[#6366f1]">Dari selector aktif</span>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#e2e8f0] dark:border-[#334155]">
