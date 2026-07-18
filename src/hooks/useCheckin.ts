@@ -35,6 +35,11 @@ interface ApiCheckinStats {
   by_method?: ApiMethodStat[];
 }
 
+function getApiErrorMessage(error: unknown, fallback: string) {
+  const responseData = (error as { response?: { data?: { error?: string; message?: string } } }).response?.data;
+  return responseData?.error ?? responseData?.message ?? fallback;
+}
+
 function normalizeCheckinMethod(method?: string): Checkin['checkinMethod'] {
   switch (method) {
     case 'qr_scan':
@@ -141,8 +146,7 @@ export function useCheckin(eventId?: string) {
         throw checkinsRes.reason;
       }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      const msg = axiosErr.response?.data?.message ?? 'Gagal memuat check-in';
+      const msg = getApiErrorMessage(err, 'Gagal memuat check-in');
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -182,8 +186,7 @@ export function useCheckin(eventId?: string) {
         setCheckins((prev) => [newCheckin, ...prev]);
         return newCheckin;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal melakukan check-in');
+        throw new Error(getApiErrorMessage(err, 'Gagal melakukan check-in'));
       }
     },
     [access, activeEventId, isLoadingAccess]
@@ -212,8 +215,7 @@ export function useCheckin(eventId?: string) {
         setCheckins((prev) => [newCheckin, ...prev]);
         return newCheckin;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal memindai QR');
+        throw new Error(getApiErrorMessage(err, 'Gagal memindai QR'));
       }
     },
     [access, activeEventId, isLoadingAccess]
@@ -249,8 +251,7 @@ export function useCheckin(eventId?: string) {
         setCheckins((prev) => [newCheckin, ...prev]);
         return newCheckin;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal mendaftarkan walk-in');
+        throw new Error(getApiErrorMessage(err, 'Gagal mendaftarkan walk-in'));
       }
     },
     [access, activeEventId, isLoadingAccess]

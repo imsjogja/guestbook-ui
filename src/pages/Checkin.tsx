@@ -101,6 +101,7 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerControlsRef = useRef<IScannerControls | null>(null);
   const processingRef = useRef(false);
+  const processScanRef = useRef<(rawValue: string) => void>(() => {});
   const lastTokenRef = useRef({ token: '', scannedAt: 0 });
   const overlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { scanToken } = useCheckin();
@@ -155,7 +156,13 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
       setScanInput('');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal memindai QR';
-      setOverlayTitle('QR tidak valid');
+      if (/already checked in|sudah check-in/i.test(msg)) {
+        setOverlayTitle('Sudah Check-in');
+      } else if (/another event|event lain|acara lain/i.test(msg)) {
+        setOverlayTitle('Acara Tidak Sesuai');
+      } else {
+        setOverlayTitle('QR tidak valid');
+      }
       setOverlayMessage(msg);
       setOverlay('error');
     } finally {
@@ -169,6 +176,10 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
   }, [processScan, scanInput]);
 
   useEffect(() => {
+    processScanRef.current = processScan;
+  }, [processScan]);
+
+  useEffect(() => {
     if (!cameraOn || !videoRef.current) return;
 
     let cancelled = false;
@@ -180,13 +191,15 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
 
     const startCamera = async () => {
       try {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        if (cancelled) return;
         controls = await reader.decodeFromConstraints(
           { audio: false, video: { facingMode: { ideal: 'environment' } } },
           videoElement,
           (result) => {
             if (cancelled || !result) return;
             setCameraReady(true);
-            void processScan(result.getText());
+            void processScanRef.current(result.getText());
           },
         );
         if (!cancelled) {
@@ -212,8 +225,9 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
       if (stream instanceof MediaStream) {
         stream.getTracks().forEach((track) => track.stop());
       }
+      videoElement.srcObject = null;
     };
-  }, [cameraOn, processScan]);
+  }, [cameraOn]);
 
   useEffect(() => () => {
     scannerControlsRef.current?.stop();
