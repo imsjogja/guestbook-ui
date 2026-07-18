@@ -27,7 +27,8 @@ export function useEventMembers(eventId?: string) {
     ]);
 
     if (membersResult.status === 'fulfilled') {
-      setMembers(membersResult.value.data.data ?? []);
+      // Keep the UI aligned with the active assignment model during rollout.
+      setMembers((membersResult.value.data.data ?? []).filter((member) => member.status !== 'inactive'));
     } else {
       const axiosErr = membersResult.reason as { response?: { data?: { error?: string; message?: string } } };
       setMembers([]);
