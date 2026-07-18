@@ -41,6 +41,7 @@ import { useGuests, useInvitations, useTemplates, useWhatsAppMessaging } from '@
 import { useTenantStore } from '@/store/tenantStore';
 import { QRCodeSVG } from '@/components/QRCodeSVG';
 import { toast } from 'sonner';
+import { getInvitationGuestDisplay } from '@/lib/invitation-display';
 
 /* ── Extended UI Type ─────────────────────────────── */
 type InvitationStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | 'revoked';
@@ -193,15 +194,19 @@ export default function Undangan() {
     return uiInvitations.filter((inv) => {
       const matchesSearch =
         !search ||
-        inv.guestId.toLowerCase().includes(search.toLowerCase()) ||
-        inv.id.toLowerCase().includes(search.toLowerCase());
+        [
+          inv.guestId,
+          inv.id,
+          getInvitationGuestDisplay(inv.guestId, guestById.get(inv.guestId)).name,
+          getInvitationGuestDisplay(inv.guestId, guestById.get(inv.guestId)).phone,
+        ].some((value) => value.toLowerCase().includes(search.toLowerCase()));
       const matchesChannel =
         channelFilter === 'all' || inv.channel === channelFilter;
       const matchesStatus =
         statusFilter === 'all' || inv.status === statusFilter;
       return matchesSearch && matchesChannel && matchesStatus;
     });
-  }, [uiInvitations, search, channelFilter, statusFilter]);
+  }, [uiInvitations, guestById, search, channelFilter, statusFilter]);
 
   /* ── Stats ──────────────────────────────────────── */
 
@@ -503,7 +508,7 @@ export default function Undangan() {
                   />
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">
-                  Tamu (ID)
+                  Tamu
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">
                   Template
@@ -550,9 +555,19 @@ export default function Undangan() {
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-[#1e293b] dark:text-[#f8fafc]">
-                          Tamu {inv.guestId.slice(0, 8)}
-                        </div>
+                        {(() => {
+                          const guestDisplay = getInvitationGuestDisplay(inv.guestId, guestById.get(inv.guestId));
+                          return (
+                            <>
+                              <div className="font-medium text-[#1e293b] dark:text-[#f8fafc]">
+                                {guestDisplay.name}
+                              </div>
+                              <div className="text-xs text-[#64748b] mt-0.5">
+                                {guestDisplay.phone}
+                              </div>
+                            </>
+                          );
+                        })()}
                         <div className="text-xs text-[#94a3b8] mt-0.5">
                           {inv.shortLink || inv.guestId}
                         </div>
