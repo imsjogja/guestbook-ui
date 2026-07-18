@@ -112,7 +112,7 @@ export function useRSVP(eventId?: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchRSVPs = useCallback(async () => {
+  const fetchRSVPs = useCallback(async (silent = false) => {
     if (!eventId) {
       setRsvps([]);
       setBreakdown({
@@ -127,10 +127,12 @@ export function useRSVP(eventId?: string) {
       return;
     }
 
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
     setError(null);
     try {
-      const params = eventId ? { eventId } : {};
+      // The guest list is event-scoped, so load the complete RSVP set used by
+      // the table join instead of the API default page of 20 records.
+      const params = eventId ? { eventId, page: 1, per_page: 100 } : {};
       const [rsvpsRes, breakdownRes] = await Promise.all([
         api.get<{ data: ApiRSVP[] }>('/rsvp', { params }),
         api.get<{ data: ApiRSVPBreakdown }>('/rsvp/breakdown', { params }),
@@ -142,13 +144,16 @@ export function useRSVP(eventId?: string) {
       const msg = axiosErr.response?.data?.message ?? 'Gagal memuat RSVP';
       setError(msg);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [eventId]);
 
   useEffect(() => {
     fetchRSVPs();
   }, [fetchRSVPs]);
+
+  const refetch = useCallback(() => fetchRSVPs(), [fetchRSVPs]);
+  const refreshSilently = useCallback(() => fetchRSVPs(true), [fetchRSVPs]);
 
   const updateRSVP = useCallback(
     async (id: string, data: Partial<RSVP>) => {
@@ -199,7 +204,8 @@ export function useRSVP(eventId?: string) {
     breakdown,
     isLoading,
     error,
-    refetch: fetchRSVPs,
+    refetch,
+    refreshSilently,
     updateRSVP,
     saveRSVPForGuest,
   };

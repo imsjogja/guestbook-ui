@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, type ChangeEvent } from 'react';
+import { useState, useMemo, useRef, useEffect, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -21,7 +21,8 @@ import {
 import { cn } from '@/lib/utils';
 import { getGuestInitials } from '@/lib/normalizers';
 import { useGuests } from '@/hooks/useGuests';
-import { useTemplates, useWhatsAppMessaging } from '@/hooks';
+import { useRSVP, useSeating, useTemplates, useWhatsAppMessaging } from '@/hooks';
+import { buildRsvpByGuestId, buildTableByGuestId, getGuestRsvpStatus, getGuestTableName } from '@/lib/guest-live-data';
 import type { Guest } from '@/types';
 import { toast } from 'sonner';
 import { useTenantStore } from '@/store/tenantStore';
@@ -52,9 +53,8 @@ function getTypeConfig(guest: Guest) {
   return typeConfig[guest.category] || typeConfig.other;
 }
 
-function getRsvpLabel(_guest: Guest) {
-  // RSVP is separate in the API; show as "Belum Membalas" until fetched
-  return rsvpConfig['no_response'];
+function getRsvpLabel(status: string) {
+  return rsvpConfig[status] || rsvpConfig['no_response'];
 }
 
 /* ─── Skeleton Row ─── */
@@ -85,10 +85,13 @@ export default function Tamu() {
     createGuest,
     updateGuest,
     deleteGuest,
+    refreshSilently: refreshGuestsSilently,
     importCSV,
     downloadTemplateCSV,
     exportGuestsCSV,
   } = useGuests(currentEventId);
+  const { rsvps, refreshSilently: refreshRsvpsSilently } = useRSVP(currentEventId);
+  const { tables, refreshSilently: refreshTablesSilently } = useSeating();
   const { templates } = useTemplates();
   const { sendWhatsApp, isSending: isSendingWhatsApp } = useWhatsAppMessaging();
   const [searchQuery, setSearchQuery] = useState('');
@@ -129,6 +132,29 @@ export default function Tamu() {
   const [formSegment, setFormSegment] = useState('');
   const [_formRsvp, setFormRsvp] = useState('no_response');
 
+  const rsvpByGuestId = useMemo(() => buildRsvpByGuestId(rsvps), [rsvps]);
+  const tableByGuestId = useMemo(() => buildTableByGuestId(tables), [tables]);
+
+  // Keep the roster join current after RSVP, seating, check-in, or invitation
+  // actions are performed in another tab or on an operator's device.
+  useEffect(() => {
+    if (!currentEventId) return;
+
+    const refresh = () => {
+      void Promise.all([
+        refreshGuestsSilently(),
+        refreshRsvpsSilently(),
+        refreshTablesSilently(),
+      ]);
+    };
+    const interval = window.setInterval(refresh, 10000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [currentEventId, refreshGuestsSilently, refreshRsvpsSilently, refreshTablesSilently]);
+
   /* ─── Segments from data ─── */
   const segments = useMemo(() => {
     const set = new Set(guests.map((g) => g.subgroup).filter(Boolean));
@@ -148,13 +174,11 @@ export default function Tamu() {
     }
     if (typeFilter !== 'all') data = data.filter((g) => g.category === typeFilter);
     if (segmentFilter !== 'all') data = data.filter((g) => g.subgroup === segmentFilter);
-    // RSVP filter is client-side since we don't have RSVP data embedded
     if (rsvpFilter !== 'all') {
-      // Placeholder: would filter by actual RSVP status
-      data = data;
+      data = data.filter((guest) => getGuestRsvpStatus(guest, rsvpByGuestId) === rsvpFilter);
     }
     return data;
-  }, [guests, searchQuery, typeFilter, segmentFilter, rsvpFilter]);
+  }, [guests, searchQuery, typeFilter, segmentFilter, rsvpFilter, rsvpByGuestId]);
 
   /* ─── Paginated ─── */
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
@@ -545,7 +569,8 @@ export default function Tamu() {
                   <AnimatePresence>
                     {paginated.map((g, i) => {
                       const t = getTypeConfig(g);
-                      const r = getRsvpLabel(g);
+                      const r = getRsvpLabel(getGuestRsvpStatus(g, rsvpByGuestId));
+                      const tableName = getGuestTableName(g, tableByGuestId);
                       return (
                         <motion.tr key={g.id}
                           initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
@@ -587,7 +612,7 @@ export default function Tamu() {
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-sm text-[#64748b]">-</span>
+                            <span className="text-sm text-[#64748b]">{tableName || 'Belum Diatur'}</span>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

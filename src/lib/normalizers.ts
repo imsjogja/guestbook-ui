@@ -1,4 +1,4 @@
-import type { Event, Template } from '@/types';
+import type { Event, Invitation, Template } from '@/types';
 
 type BackendEvent = {
   id: string;
@@ -63,6 +63,15 @@ type BackendInvitation = {
   delivered_at?: string | null;
   read_at?: string | null;
   failed_reason?: string | null;
+  delivery_status?: string | null;
+  delivery_channel?: string | null;
+  delivery_sent_at?: string | null;
+  delivery_delivered_at?: string | null;
+  delivery_read_at?: string | null;
+  delivery_failed_at?: string | null;
+  delivery_error_message?: string | null;
+  delivery_external_id?: string | null;
+  delivery_provider_http_status?: number | null;
   qr_code_url?: string | null;
   short_link?: string | null;
   created_at: string;
@@ -308,10 +317,19 @@ export function normalizeGuestDetail(raw: BackendGuest) {
     eventId: inv.event_id,
     channel: (inv.channel === 'whatsapp' || inv.channel === 'email' || inv.channel === 'both') ? inv.channel : 'both',
     status: inv.status ?? 'draft',
+    deliveryStatus: normalizeInvitationDeliveryStatus(inv.delivery_status),
+    deliveryChannel: normalizeInvitationDeliveryChannel(inv.delivery_channel),
     sentAt: inv.sent_at ?? undefined,
     deliveredAt: inv.delivered_at ?? undefined,
     readAt: inv.read_at ?? undefined,
     failedReason: inv.failed_reason ?? undefined,
+    deliverySentAt: inv.delivery_sent_at ?? undefined,
+    deliveryDeliveredAt: inv.delivery_delivered_at ?? undefined,
+    deliveryReadAt: inv.delivery_read_at ?? undefined,
+    deliveryFailedAt: inv.delivery_failed_at ?? undefined,
+    deliveryErrorMessage: inv.delivery_error_message ?? undefined,
+    deliveryExternalId: inv.delivery_external_id ?? undefined,
+    deliveryProviderHttpStatus: inv.delivery_provider_http_status ?? undefined,
     qrCodeUrl: inv.qr_code_url ?? undefined,
     shortLink: inv.short_link ?? undefined,
     createdAt: inv.created_at,
@@ -337,24 +355,58 @@ export function normalizeGuestDetail(raw: BackendGuest) {
   };
 }
 
-export function normalizeInvitation(raw: BackendInvitation): import('@/types').Invitation {
+function normalizeInvitationLifecycleStatus(status?: string | null): Invitation['status'] {
+  switch (status) {
+    case 'draft':
+    case 'sent':
+    case 'opened':
+    case 'responded':
+    case 'expired':
+    case 'revoked':
+    case 'failed':
+      return status;
+    default:
+      return 'draft';
+  }
+}
+
+function normalizeInvitationDeliveryStatus(status?: string | null): Invitation['deliveryStatus'] {
+  switch (status) {
+    case 'queued':
+    case 'sent':
+    case 'delivered':
+    case 'read':
+    case 'failed':
+      return status;
+    default:
+      return 'not_sent';
+  }
+}
+
+function normalizeInvitationDeliveryChannel(channel?: string | null): Invitation['deliveryChannel'] {
+  return channel === 'whatsapp' || channel === 'email' || channel === 'sms' ? channel : undefined;
+}
+
+export function normalizeInvitation(raw: BackendInvitation): Invitation {
   return {
     id: raw.id,
     guestId: raw.guest_id,
     eventId: raw.event_id,
     channel: raw.channel === 'whatsapp' || raw.channel === 'email' || raw.channel === 'both' ? raw.channel : 'both',
-    status:
-      raw.status === 'sent' ||
-      raw.status === 'delivered' ||
-      raw.status === 'read' ||
-      raw.status === 'failed' ||
-      raw.status === 'pending'
-        ? raw.status
-        : 'pending',
+    status: normalizeInvitationLifecycleStatus(raw.status),
+    deliveryStatus: normalizeInvitationDeliveryStatus(raw.delivery_status),
+    deliveryChannel: normalizeInvitationDeliveryChannel(raw.delivery_channel),
     sentAt: raw.sent_at ?? undefined,
     deliveredAt: raw.delivered_at ?? undefined,
     readAt: raw.read_at ?? undefined,
     failedReason: raw.failed_reason ?? undefined,
+    deliverySentAt: raw.delivery_sent_at ?? undefined,
+    deliveryDeliveredAt: raw.delivery_delivered_at ?? undefined,
+    deliveryReadAt: raw.delivery_read_at ?? undefined,
+    deliveryFailedAt: raw.delivery_failed_at ?? undefined,
+    deliveryErrorMessage: raw.delivery_error_message ?? undefined,
+    deliveryExternalId: raw.delivery_external_id ?? undefined,
+    deliveryProviderHttpStatus: raw.delivery_provider_http_status ?? undefined,
     qrCodeUrl: raw.qr_code_url ?? raw.url ?? undefined,
     shortLink: raw.short_link ?? raw.url ?? undefined,
     createdAt: raw.created_at,

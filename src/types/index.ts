@@ -166,17 +166,29 @@ export interface Table {
 
 // ── Invitation ────────────────────────────────────────
 
+export type InvitationLifecycleStatus = 'draft' | 'sent' | 'opened' | 'responded' | 'expired' | 'revoked' | 'failed';
+export type InvitationDeliveryStatus = 'not_sent' | 'queued' | 'sent' | 'delivered' | 'read' | 'failed';
+
 export interface Invitation {
   id: string;
   guestId: string;
   eventId: string;
   channel: 'whatsapp' | 'email' | 'both';
-  status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+  status: InvitationLifecycleStatus;
+  deliveryStatus: InvitationDeliveryStatus;
+  deliveryChannel?: 'whatsapp' | 'email' | 'sms';
   templateId?: string;
   sentAt?: string;
   deliveredAt?: string;
   readAt?: string;
   failedReason?: string;
+  deliverySentAt?: string;
+  deliveryDeliveredAt?: string;
+  deliveryReadAt?: string;
+  deliveryFailedAt?: string;
+  deliveryErrorMessage?: string;
+  deliveryExternalId?: string;
+  deliveryProviderHttpStatus?: number;
   qrCodeUrl?: string;
   shortLink?: string;
   createdAt: string;

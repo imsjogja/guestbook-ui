@@ -26,7 +26,8 @@ export interface UseSeatingReturn {
   tables: Table[];
   isLoading: boolean;
   error: string | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
+  refreshSilently: () => Promise<void>;
   createTable: (data: Partial<Table>) => Promise<Table | null>;
   updateTable: (id: string, data: Partial<Table>) => Promise<Table | null>;
   deleteTable: (id: string) => Promise<boolean>;
@@ -60,7 +61,7 @@ export function useSeating(): UseSeatingReturn {
     };
   }, []);
 
-  const fetchTables = useCallback(async () => {
+  const fetchTables = useCallback(async (silent = false) => {
     if (!currentEventId) {
       setTables([]);
       setError(null);
@@ -68,7 +69,7 @@ export function useSeating(): UseSeatingReturn {
       return;
     }
 
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
     setError(null);
     try {
       const res = await api.get<ApiResponse<BackendSeatingLayout>>('/seating/layout');
@@ -78,13 +79,16 @@ export function useSeating(): UseSeatingReturn {
       const msg = err instanceof Error ? err.message : 'Gagal memuat data seating';
       setError(msg);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [currentEventId, normalizeTable]);
 
   useEffect(() => {
     fetchTables();
   }, [fetchTables]);
+
+  const refetch = useCallback(() => fetchTables(), [fetchTables]);
+  const refreshSilently = useCallback(() => fetchTables(true), [fetchTables]);
 
   const createTable = useCallback(async (data: Partial<Table>): Promise<Table | null> => {
     if (!currentEventId) {
@@ -229,5 +233,5 @@ export function useSeating(): UseSeatingReturn {
     }
   }, [currentEventId, fetchTables]);
 
-  return { tables, isLoading, error, refetch: fetchTables, createTable, updateTable, deleteTable, assignGuest, unassignGuest, autoAssign };
+  return { tables, isLoading, error, refetch, refreshSilently, createTable, updateTable, deleteTable, assignGuest, unassignGuest, autoAssign };
 }

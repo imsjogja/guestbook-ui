@@ -118,8 +118,8 @@ export function useGuests(eventId?: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchGuests = useCallback(async () => {
-    setIsLoading(true);
+  const fetchGuests = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     setError(null);
     try {
       const params = eventId ? { status: 'active' } : {};
@@ -136,13 +136,16 @@ export function useGuests(eventId?: string) {
       const msg = axiosErr.response?.data?.message ?? 'Gagal memuat tamu';
       setError(msg);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [eventId]);
 
   useEffect(() => {
     fetchGuests();
   }, [fetchGuests]);
+
+  const refetch = useCallback(() => fetchGuests(), [fetchGuests]);
+  const refreshSilently = useCallback(() => fetchGuests(true), [fetchGuests]);
 
   const createGuest = useCallback(
     async (data: Partial<Guest>) => {
@@ -270,7 +273,8 @@ export function useGuests(eventId?: string) {
     total,
     isLoading,
     error,
-    refetch: fetchGuests,
+    refetch,
+    refreshSilently,
     createGuest,
     updateGuest,
     deleteGuest,

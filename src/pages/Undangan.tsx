@@ -51,6 +51,7 @@ interface UIInvitation {
   eventId: string;
   channel: 'whatsapp' | 'email' | 'both';
   status: InvitationStatus;
+  invitationStatus: string;
   templateId?: string;
   sentAt?: string | null;
   readAt?: string | null;
@@ -59,6 +60,8 @@ interface UIInvitation {
   shortLink?: string;
   createdAt?: string;
   updatedAt?: string;
+  failedReason?: string;
+  providerHttpStatus?: number;
 }
 
 type SendResult = {
@@ -80,13 +83,13 @@ const statusConfig: Record<
   { label: string; icon: React.ReactNode; badgeClass: string; dotClass: string }
 > = {
   pending: {
-    label: 'Belum Terkirim',
+    label: 'Belum Dikirim',
     icon: <Clock size={14} />,
     badgeClass: 'bg-[#fef3c7] text-[#92400e] border-[#f59e0b]/30',
     dotClass: 'bg-[#f59e0b]',
   },
   sent: {
-    label: 'Terkirim',
+    label: 'Diterima Provider',
     icon: <Send size={14} />,
     badgeClass: 'bg-[#f1f5f9] text-[#475569] border-[#cbd5e1]',
     dotClass: 'bg-[#64748b]',
@@ -142,7 +145,29 @@ export default function Undangan() {
   const [sendTargetIds, setSendTargetIds] = useState<string[]>([]);
   const [sendTemplateId, setSendTemplateId] = useState('');
 
-  const uiInvitations = invitations as UIInvitation[];
+  const uiInvitations: UIInvitation[] = invitations.map((invitation) => {
+    const deliveryStatus = invitation.deliveryStatus === 'sent'
+      || invitation.deliveryStatus === 'delivered'
+      || invitation.deliveryStatus === 'read'
+      || invitation.deliveryStatus === 'failed'
+      ? invitation.deliveryStatus
+      : 'pending';
+    const deliveryChannel = invitation.deliveryChannel === 'whatsapp' || invitation.deliveryChannel === 'email'
+      ? invitation.deliveryChannel
+      : invitation.channel;
+
+    return {
+      ...invitation,
+      status: deliveryStatus,
+      invitationStatus: invitation.status,
+      channel: deliveryChannel,
+      sentAt: invitation.deliverySentAt,
+      deliveredAt: invitation.deliveryDeliveredAt,
+      readAt: invitation.deliveryReadAt,
+      failedReason: invitation.deliveryErrorMessage || invitation.failedReason,
+      providerHttpStatus: invitation.deliveryProviderHttpStatus,
+    };
+  });
   const invitedGuestIds = useMemo(() => new Set(uiInvitations.map((inv) => inv.guestId)), [uiInvitations]);
   const batchCandidates = useMemo(
     () => rosterGuests.filter((guest) => !invitedGuestIds.has(guest.id)),
@@ -404,10 +429,10 @@ export default function Undangan() {
       {/* Stats Bar */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         {[
-          { label: 'Total Terkirim', value: stats.totalSent, icon: <Send size={16} />, color: 'text-[#4f46e5]', bg: 'bg-[#eef2ff]' },
+          { label: 'Diterima Provider', value: stats.totalSent, icon: <Send size={16} />, color: 'text-[#4f46e5]', bg: 'bg-[#eef2ff]' },
           { label: 'Tersampaikan (WA)', value: stats.whatsappDelivered, icon: <MessageCircle size={16} />, color: 'text-[#10b981]', bg: 'bg-[#d1fae5]' },
           { label: 'Dibaca', value: stats.read, icon: <Eye size={16} />, color: 'text-[#4f46e5]', bg: 'bg-[#eef2ff]' },
-          { label: 'Belum Terkirim', value: stats.pending, icon: <Clock size={16} />, color: 'text-[#f59e0b]', bg: 'bg-[#fef3c7]' },
+          { label: 'Belum Dikirim', value: stats.pending, icon: <Clock size={16} />, color: 'text-[#f59e0b]', bg: 'bg-[#fef3c7]' },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -566,6 +591,21 @@ export default function Undangan() {
                           {cfg.icon}
                           {cfg.label}
                         </span>
+                        {inv.status === 'sent' && inv.providerHttpStatus && (
+                          <span className="block mt-1 text-[10px] text-[#94a3b8]" title="Bukti provider menerima request">
+                            Provider HTTP {inv.providerHttpStatus}
+                          </span>
+                        )}
+                        {inv.status === 'sent' && !inv.providerHttpStatus && (
+                          <span className="block mt-1 text-[10px] text-[#b45309]" title="Pesan dibuat sebelum receipt provider disimpan">
+                            Receipt provider belum tercatat
+                          </span>
+                        )}
+                        {inv.status === 'failed' && inv.failedReason && (
+                          <span className="block mt-1 max-w-[180px] truncate text-[10px] text-[#be123c]" title={inv.failedReason}>
+                            {inv.failedReason}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {inv.sentAt ? (
@@ -575,7 +615,7 @@ export default function Undangan() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {inv.status !== 'pending' && inv.status !== 'revoked' ? (
+                        {inv.invitationStatus !== 'revoked' ? (
                           <button
                             onClick={() => openQrModal(inv)}
                             className="inline-flex items-center gap-1 text-xs font-medium text-[#4f46e5] hover:text-[#6366f1] transition-colors"
@@ -599,7 +639,7 @@ export default function Undangan() {
                               <RotateCcw size={15} />
                             </button>
                           )}
-                          {inv.status !== 'revoked' && inv.status !== 'pending' && (
+                          {inv.invitationStatus !== 'revoked' && (
                             <button
                               onClick={() => openQrModal(inv)}
                               className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors"
@@ -608,7 +648,7 @@ export default function Undangan() {
                               <QrCode size={15} />
                             </button>
                           )}
-                          {inv.status !== 'revoked' && (
+                          {inv.invitationStatus !== 'revoked' && (
                             <button
                               onClick={() => openSendModal([inv.guestId])}
                               className="p-1.5 rounded-md hover:bg-[#ecfdf5] text-[#64748b] hover:text-[#059669] transition-colors"
@@ -617,7 +657,7 @@ export default function Undangan() {
                               <MessageCircle size={15} />
                             </button>
                           )}
-                          {inv.status !== 'revoked' && (
+                          {inv.invitationStatus !== 'revoked' && (
                             <button
                               onClick={() => openRevokeModal(inv)}
                               className="p-1.5 rounded-md hover:bg-[#ffe4e6] text-[#64748b] hover:text-[#f43f5e] transition-colors"

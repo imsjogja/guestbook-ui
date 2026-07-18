@@ -77,6 +77,23 @@ const rsvpConfig: Record<string, { label: string; bg: string; text: string; bord
   'no_response': { label: 'Belum Membalas', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]', icon: <Clock size={20} />, desc: 'Menunggu respons tamu' },
 };
 
+const deliveryStatusLabels: Record<string, string> = {
+  not_sent: 'Belum Dikirim',
+  queued: 'Dalam Antrean',
+  sent: 'Diterima Provider',
+  delivered: 'Tersampaikan',
+  read: 'Dibaca',
+  failed: 'Gagal',
+};
+
+const invitationStatusLabels: Record<string, string> = {
+  draft: 'Draft',
+  opened: 'Dibuka',
+  responded: 'Sudah RSVP',
+  expired: 'Kedaluwarsa',
+  revoked: 'Dicabut',
+};
+
 const typeConfig: Record<string, { bg: string; text: string }> = {
   'vip': { bg: 'bg-[#eef2ff]', text: 'text-[#4f46e5]' },
   'vvip': { bg: 'bg-[#fef3c7]', text: 'text-[#b45309]' },
@@ -661,11 +678,37 @@ export default function TamuDetail() {
                 <div className="space-y-4">
                   <div className="rounded-lg border border-[#e2e8f0] dark:border-[#334155] bg-[#f8fafc] dark:bg-[#1e293b] p-4 space-y-3">
                     <div>
-                      <p className="text-[11px] font-medium text-[#94a3b8] uppercase tracking-wider mb-1">Status</p>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[#d1fae5] text-[#059669] border border-[#a7f3d0]">
-                        <CheckCircle2 size={14} />
-                        {invitation.status}
+                      <p className="text-[11px] font-medium text-[#94a3b8] uppercase tracking-wider mb-1">Status Delivery</p>
+                      <span className={cn(
+                        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border',
+                        invitation.deliveryStatus === 'failed'
+                          ? 'bg-[#ffe4e6] text-[#be123c] border-[#fecdd3]'
+                          : invitation.deliveryStatus === 'not_sent'
+                            ? 'bg-[#f1f5f9] text-[#64748b] border-[#e2e8f0]'
+                            : 'bg-[#d1fae5] text-[#059669] border-[#a7f3d0]'
+                      )}>
+                        {invitation.deliveryStatus === 'failed' ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
+                        {deliveryStatusLabels[invitation.deliveryStatus] || invitation.deliveryStatus}
                       </span>
+                      {invitation.deliveryProviderHttpStatus && (
+                        <p className="mt-1 text-[11px] text-[#94a3b8]">
+                          Bukti provider: HTTP {invitation.deliveryProviderHttpStatus}
+                        </p>
+                      )}
+                      {invitation.deliveryStatus === 'sent' && !invitation.deliveryProviderHttpStatus && (
+                        <p className="mt-1 text-[11px] text-[#b45309]">
+                          Receipt provider belum tercatat pada data lama
+                        </p>
+                      )}
+                      {invitation.deliveryErrorMessage && (
+                        <p className="mt-1 text-[11px] text-[#be123c]">{invitation.deliveryErrorMessage}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium text-[#94a3b8] uppercase tracking-wider mb-1">Lifecycle Undangan</p>
+                      <p className="text-sm text-[#0f172a] dark:text-[#f8fafc]">
+                        {invitationStatusLabels[invitation.status] || invitation.status}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[11px] font-medium text-[#94a3b8] uppercase tracking-wider mb-1">Link Undangan</p>

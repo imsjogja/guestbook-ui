@@ -15,6 +15,15 @@ type BackendInvitation = {
   delivered_at?: string | null;
   read_at?: string | null;
   failed_reason?: string | null;
+  delivery_status?: string | null;
+  delivery_channel?: string | null;
+  delivery_sent_at?: string | null;
+  delivery_delivered_at?: string | null;
+  delivery_read_at?: string | null;
+  delivery_failed_at?: string | null;
+  delivery_error_message?: string | null;
+  delivery_external_id?: string | null;
+  delivery_provider_http_status?: number | null;
   qr_code_url?: string | null;
   short_link?: string | null;
   created_at: string;
