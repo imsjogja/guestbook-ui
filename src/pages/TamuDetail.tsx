@@ -27,7 +27,7 @@ import { id as idID } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { getGuestInitials } from '@/lib/normalizers';
 import { QRCodeSVG, downloadQRCodeSvg } from '@/components/QRCodeSVG';
-import { useGuestDetail, useInvitations, useRSVP } from '@/hooks';
+import { useEventAccess, useGuestDetail, useInvitations, useRSVP } from '@/hooks';
 import { useTenantStore } from '@/store/tenantStore';
 import { toast } from 'sonner';
 
@@ -97,8 +97,15 @@ export default function TamuDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('ringkasan');
-  const currentEventId = useTenantStore((s) => s.currentEvent?.id);
-  const { invitations, createInvitation } = useInvitations(currentEventId);
+  const currentEvent = useTenantStore((s) => s.currentEvent);
+  const currentEventId = currentEvent?.id;
+  const { access, isLoading: isLoadingAccess } = useEventAccess();
+  const {
+    invitations,
+    createInvitation,
+    error: invitationError,
+    isLoading: isLoadingInvitations,
+  } = useInvitations(currentEventId);
   const { rsvps, saveRSVPForGuest } = useRSVP(currentEventId);
   const [showRsvpEdit, setShowRsvpEdit] = useState(false);
   const [selectedRsvpStatus, setSelectedRsvpStatus] = useState<EditableRSVPStatus>('attending');
@@ -118,6 +125,17 @@ export default function TamuDetail() {
   const rsvpCfg = rsvp ? rsvpConfig[rsvp.status] || rsvpConfig['no_response'] : rsvpConfig['no_response'];
   const invitationCode = invitation?.qrCodeUrl || invitation?.shortLink || invitation?.id || '';
   const invitationLabel = invitation ? `Tamu ${guest?.fullName ?? ''}` : 'Belum ada undangan';
+  const canReadInvitations = access?.permissions.includes('invitation:read') ?? false;
+  const canWriteInvitations = access?.permissions.includes('invitation:write') ?? false;
+  const roleLabel: Record<string, string> = {
+    tenant_owner: 'Tenant Owner',
+    event_manager: 'Event Manager',
+    rsvp_officer: 'RSVP Officer',
+    registration_officer: 'Registration Officer',
+    usher: 'Usher',
+    gift_officer: 'Gift Officer',
+    viewer: 'Viewer',
+  };
 
   const openRsvpEdit = () => {
     setSelectedRsvpStatus(rsvp?.status === 'not_attending' || rsvp?.status === 'maybe' ? rsvp.status : 'attending');
@@ -134,9 +152,12 @@ export default function TamuDetail() {
     try {
       let activeInvitation = invitation;
       if (!activeInvitation) {
+        if (!canWriteInvitations) {
+          throw new Error('RSVP belum dapat disimpan karena tamu belum memiliki undangan dan role Anda tidak dapat membuat undangan');
+        }
         activeInvitation = await createInvitation({ guestId: guest.id });
         if (!activeInvitation) {
-          throw new Error('Gagal menyiapkan undangan untuk RSVP');
+          throw new Error('Gagal menyiapkan undangan untuk RSVP. Pastikan tamu terdaftar pada acara aktif.');
         }
       }
 
@@ -179,11 +200,25 @@ export default function TamuDetail() {
 
   const handleCreateInvitation = async () => {
     if (!guest) return;
+    if (!currentEventId) {
+      toast.error('Pilih acara aktif terlebih dahulu');
+      return;
+    }
+    if (isLoadingAccess || !access) {
+      toast.error('Akses acara sedang dimuat, coba lagi sebentar');
+      return;
+    }
+    if (!canWriteInvitations) {
+      toast.error('Role Anda tidak memiliki akses untuk membuat undangan');
+      return;
+    }
     setIsCreatingInvitation(true);
     try {
       const created = await createInvitation({ guestId: guest.id });
       if (created) {
         toast.success('Undangan berhasil dibuat');
+      } else {
+        toast.error('Gagal membuat undangan. Pastikan tamu terdaftar pada acara aktif dan role memiliki akses.');
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal membuat undangan';
@@ -541,8 +576,38 @@ export default function TamuDetail() {
             className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Invitation History */}
             <div className="bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-              <h3 className="text-base font-semibold text-[#0f172a] dark:text-[#f8fafc] mb-4">Riwayat Undangan</h3>
-              {invitation ? (
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-[#0f172a] dark:text-[#f8fafc]">Riwayat Undangan</h3>
+                  <p className="text-xs text-[#94a3b8] mt-1">Acara: {currentEvent?.name || 'Belum dipilih'}</p>
+                </div>
+                {access?.role && (
+                  <span className="shrink-0 rounded-full bg-[#f1f5f9] dark:bg-[#1e293b] px-2.5 py-1 text-[11px] font-medium text-[#64748b]">
+                    {roleLabel[access.role] || access.role}
+                  </span>
+                )}
+              </div>
+              {isLoadingAccess || isLoadingInvitations ? (
+                <div className="bg-[#f8fafc] dark:bg-[#1e293b] rounded-lg p-6 text-center border border-[#e2e8f0] dark:border-[#334155]">
+                  <Loader2 size={24} className="mx-auto text-[#4f46e5] mb-2 animate-spin" />
+                  <p className="text-sm text-[#64748b]">Memeriksa akses undangan...</p>
+                </div>
+              ) : !canReadInvitations ? (
+                <div className="bg-[#fff7ed] dark:bg-[#2a211b] rounded-lg p-5 border border-[#fed7aa] dark:border-[#7c2d12]">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle size={20} className="mt-0.5 shrink-0 text-[#c2410c]" />
+                    <div>
+                      <p className="text-sm font-medium text-[#9a3412] dark:text-[#fdba74]">Akses undangan tidak tersedia</p>
+                      <p className="text-xs text-[#c2410c] dark:text-[#fdba74] mt-1">
+                        Role {roleLabel[access?.role || ''] || 'Anda'} tidak memiliki izin untuk membaca atau membuat undangan pada acara ini.
+                      </p>
+                      <p className="text-xs text-[#c2410c] dark:text-[#fdba74] mt-2">
+                        Gunakan RSVP Officer, Event Manager, atau Tenant Owner untuk mengelola undangan.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : invitation ? (
                 <div className="space-y-4">
                   <div className="rounded-lg border border-[#e2e8f0] dark:border-[#334155] bg-[#f8fafc] dark:bg-[#1e293b] p-4 space-y-3">
                     <div>
@@ -572,6 +637,16 @@ export default function TamuDetail() {
                     </div>
                   </div>
                 </div>
+              ) : invitationError ? (
+                <div className="bg-[#fff7ed] dark:bg-[#2a211b] rounded-lg p-5 border border-[#fed7aa] dark:border-[#7c2d12]">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle size={20} className="mt-0.5 shrink-0 text-[#c2410c]" />
+                    <div>
+                      <p className="text-sm font-medium text-[#9a3412] dark:text-[#fdba74]">Undangan belum dapat dimuat</p>
+                      <p className="text-xs text-[#c2410c] dark:text-[#fdba74] mt-1">{invitationError}</p>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <div className="bg-[#f8fafc] dark:bg-[#1e293b] rounded-lg p-6 text-center border border-[#e2e8f0] dark:border-[#334155]">
                   <Mail size={24} className="mx-auto text-[#94a3b8] mb-2" />
@@ -584,7 +659,18 @@ export default function TamuDetail() {
             <div className="bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-xl p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
               <h3 className="text-base font-semibold text-[#0f172a] dark:text-[#f8fafc] mb-4">Kode QR</h3>
               <div className="flex flex-col items-center">
-                {invitationCode ? (
+                {isLoadingAccess || isLoadingInvitations ? (
+                  <div className="w-full rounded-xl border border-dashed border-[#e2e8f0] py-12 text-center">
+                    <Loader2 size={40} className="mx-auto text-[#4f46e5] mb-3 animate-spin" />
+                    <p className="text-sm text-[#64748b]">Memeriksa akses undangan...</p>
+                  </div>
+                ) : !canReadInvitations ? (
+                  <div className="w-full rounded-xl border border-dashed border-[#fed7aa] bg-[#fff7ed] dark:bg-[#2a211b] py-10 px-5 text-center">
+                    <AlertTriangle size={40} className="mx-auto text-[#c2410c] mb-3" />
+                    <p className="text-sm font-medium text-[#9a3412] dark:text-[#fdba74]">QR tidak dapat diakses</p>
+                    <p className="text-xs text-[#c2410c] dark:text-[#fdba74] mt-1">Pilih akun dengan akses undangan untuk membuat atau melihat QR.</p>
+                  </div>
+                ) : invitationCode ? (
                   <>
                     <div className="w-[220px] min-h-[220px] bg-white rounded-xl border-2 border-dashed border-[#e2e8f0] flex flex-col items-center justify-center gap-3 mb-4 p-4">
                       <QRCodeSVG code={invitationCode} size={200} />
@@ -608,7 +694,7 @@ export default function TamuDetail() {
                       </button>
                     </div>
                   </>
-                ) : (
+                ) : canWriteInvitations ? (
                   <div className="w-full rounded-xl border border-dashed border-[#e2e8f0] py-12 text-center">
                     <QrCode size={40} className="mx-auto text-[#94a3b8] mb-3" />
                     <p className="text-sm text-[#64748b]">QR code belum tersedia</p>
@@ -621,6 +707,12 @@ export default function TamuDetail() {
                       {isCreatingInvitation ? <Loader2 size={14} className="animate-spin" /> : <QrCode size={14} />}
                       Buat Undangan
                     </button>
+                  </div>
+                ) : (
+                  <div className="w-full rounded-xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] dark:bg-[#1e293b] py-10 px-5 text-center">
+                    <QrCode size={40} className="mx-auto text-[#94a3b8] mb-3" />
+                    <p className="text-sm font-medium text-[#475569] dark:text-[#cbd5e1]">Belum ada undangan</p>
+                    <p className="text-xs text-[#64748b] mt-1">Role Anda hanya dapat membaca data. Minta RSVP Officer atau Event Manager membuat undangan.</p>
                   </div>
                 )}
               </div>
