@@ -11,6 +11,7 @@ import {
   Download,
   X,
   CalendarDays,
+  Check,
   MapPin,
   ChevronDown,
   Loader2,
@@ -61,6 +62,7 @@ function SkeletonRow() {
 /* ─── Component ─── */
 export default function Acara() {
   const navigate = useNavigate();
+  const currentEvent = useTenantStore((state) => state.currentEvent);
   const setCurrentEvent = useTenantStore((state) => state.setCurrentEvent);
   const { events, isLoading, error, createEvent, updateEvent, deleteEvent } = useEvents();
   const [searchQuery, setSearchQuery] = useState('');
@@ -79,6 +81,10 @@ export default function Acara() {
   const openEventGuests = (event: Event) => {
     setCurrentEvent(event);
     navigate(`/tamu?event=${event.id}`);
+  };
+
+  const selectEvent = (event: Event) => {
+    setCurrentEvent(event);
   };
 
   /* Form state */
@@ -439,6 +445,11 @@ export default function Acara() {
                               <div>
                                 <p className="text-sm font-medium text-[#0f172a] dark:text-[#f8fafc]">{evt.name}</p>
                                 <p className="text-xs text-[#94a3b8] mt-0.5">{eventTime}</p>
+                                {currentEvent?.id === evt.id && (
+                                  <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#4f46e5]">
+                                    <Check size={11} /> Acara aktif
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -488,7 +499,20 @@ export default function Acara() {
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => selectEvent(evt)}
+                                className={cn(
+                                  'inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold transition-colors',
+                                  currentEvent?.id === evt.id
+                                    ? 'bg-[#eef2ff] text-[#4f46e5] dark:bg-[rgba(79,70,229,0.15)]'
+                                    : 'text-[#64748b] hover:bg-[#eef2ff] hover:text-[#4f46e5]'
+                                )}
+                                title={currentEvent?.id === evt.id ? 'Acara aktif' : 'Gunakan acara ini'}
+                              >
+                                <Check size={14} />
+                                <span className="hidden xl:inline">{currentEvent?.id === evt.id ? 'Aktif' : 'Gunakan'}</span>
+                              </button>
                               <button
                                 onClick={() => openEdit(evt)}
                                 className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors"

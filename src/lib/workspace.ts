@@ -70,14 +70,12 @@ export function normalizeTenant(raw: BackendTenant): Tenant {
   };
 }
 
-function pickPreferredEvent(events: Event[], current?: Event | null): Event | null {
+export function pickCurrentEvent(events: Event[], current?: Event | null): Event | null {
   if (current) {
     const match = events.find((event) => event.id === current.id);
     if (match) return match;
   }
-
-  const active = events.find((event) => event.status === 'active');
-  return active ?? events[0] ?? null;
+  return null;
 }
 
 export async function bootstrapWorkspace(options: BootstrapOptions = {}): Promise<{
@@ -116,7 +114,7 @@ export async function bootstrapWorkspace(options: BootstrapOptions = {}): Promis
 
   const eventsRes = await api.get<ApiResponse<BackendEvent[]>>('/events');
   const events = (eventsRes.data.data ?? []).map(normalizeEvent);
-  const event = pickPreferredEvent(events, store.currentEvent);
+  const event = pickCurrentEvent(events, store.currentEvent);
   store.setCurrentEvent(event);
 
   if (!event && options.requireEvent) {

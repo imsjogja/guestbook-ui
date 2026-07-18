@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AuthenticatedLayout from './components/AuthenticatedLayout';
+import EventRequired from './components/EventRequired';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -29,21 +30,24 @@ function App() {
 
       {/* App routes — with sidebar layout */}
       <Route element={<AuthenticatedLayout />}>
-        <Route index element={<Dashboard />} />
         <Route path="acara" element={<Acara />} />
-        <Route path="tamu" element={<Tamu />} />
-        <Route path="tamu/:id" element={<TamuDetail />} />
         <Route path="kelompok-keluarga" element={<KelompokKeluarga />} />
-        <Route path="undangan" element={<Undangan />} />
-        <Route path="rsvp" element={<RSVPPage />} />
-        <Route path="check-in" element={<Checkin />} />
-        <Route path="tempat-duduk" element={<TempatDuduk />} />
         <Route path="komunikasi/template" element={<TemplateKomunikasi />} />
-        <Route path="komunikasi/kampanye" element={<KampanyeKomunikasi />} />
-        <Route path="komunikasi/pesan" element={<RiwayatPesan />} />
         <Route path="tim" element={<Tim />} />
-        <Route path="tim-acara" element={<TimAcara />} />
         <Route path="pengaturan" element={<Pengaturan />} />
+
+        <Route element={<EventRequired />}>
+          <Route index element={<Dashboard />} />
+          <Route path="tamu" element={<Tamu />} />
+          <Route path="tamu/:id" element={<TamuDetail />} />
+          <Route path="undangan" element={<Undangan />} />
+          <Route path="rsvp" element={<RSVPPage />} />
+          <Route path="check-in" element={<Checkin />} />
+          <Route path="tempat-duduk" element={<TempatDuduk />} />
+          <Route path="komunikasi/kampanye" element={<KampanyeKomunikasi />} />
+          <Route path="komunikasi/pesan" element={<RiwayatPesan />} />
+          <Route path="tim-acara" element={<TimAcara />} />
+        </Route>
       </Route>
 
       {/* Fallback */}

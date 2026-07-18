@@ -19,6 +19,7 @@ import { useTenants } from '@/hooks/useTenants';
 import { slugifyTenantName } from '@/lib/slugify';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import EventContextSelector from '@/components/EventContextSelector';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
@@ -162,6 +163,10 @@ export default function Topbar() {
         <h1 className="text-[15px] font-semibold text-[#1e293b] dark:text-[#f8fafc] leading-tight">
           {pageTitle}
         </h1>
+      </div>
+
+      <div className="min-w-0 flex-1 mx-2 max-w-[380px] sm:mx-6">
+        <EventContextSelector />
       </div>
 
       {/* Right cluster */}
