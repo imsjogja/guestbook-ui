@@ -37,7 +37,7 @@ export interface UseInvitationsReturn {
   error: string | null;
   refetch: () => void;
   createInvitation: (data: Partial<Invitation> & { guestId?: string; guestIds?: string[]; expiresAt?: string }) => Promise<Invitation | null>;
-  batchCreate: (guestIds: string[], channel: string, templateId?: string) => Promise<boolean>;
+  batchCreate: (guestIds: string[], channel: string, templateId?: string) => Promise<Invitation[]>;
   revokeInvitation: (id: string) => Promise<boolean>;
   resendInvitation: (id: string) => Promise<boolean>;
 }
@@ -107,10 +107,10 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
     }
   }, [eventId]);
 
-  const batchCreate = useCallback(async (guestIds: string[], _channel: string, _templateId?: string): Promise<boolean> => {
+  const batchCreate = useCallback(async (guestIds: string[], _channel: string, _templateId?: string): Promise<Invitation[]> => {
     if (!eventId) {
       setError('Event aktif belum dipilih');
-      return false;
+      return [];
     }
 
     try {
@@ -129,11 +129,11 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
           return [...newInvs, ...prevFiltered];
         });
       }
-      return true;
+      return newInvs;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal membuat undangan massal';
       setError(msg);
-      return false;
+      return [];
     }
   }, [eventId]);
 

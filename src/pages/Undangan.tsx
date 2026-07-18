@@ -37,7 +37,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { useGuests, useInvitations } from '@/hooks';
+import { useGuests, useInvitations, useTemplates, useWhatsAppMessaging } from '@/hooks';
 import { useTenantStore } from '@/store/tenantStore';
 import { QRCodeSVG } from '@/components/QRCodeSVG';
 import { toast } from 'sonner';
@@ -113,6 +113,8 @@ export default function Undangan() {
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
   const { invitations, isLoading, error, refetch, batchCreate, revokeInvitation, resendInvitation } = useInvitations(currentEventId);
   const { guests: rosterGuests } = useGuests(currentEventId);
+  const { templates } = useTemplates();
+  const { sendWhatsApp, isSending: isSendingWhatsApp } = useWhatsAppMessaging();
   const [search, setSearch] = useState('');
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -125,12 +127,29 @@ export default function Undangan() {
   const [batchStep, setBatchStep] = useState(1);
   const [batchGuests, setBatchGuests] = useState<string[]>([]);
   const [batchChannel, setBatchChannel] = useState('whatsapp');
+  const [batchTemplateId, setBatchTemplateId] = useState('');
+  const [sendModalOpen, setSendModalOpen] = useState(false);
+  const [sendTargetIds, setSendTargetIds] = useState<string[]>([]);
+  const [sendTemplateId, setSendTemplateId] = useState('');
 
   const uiInvitations = invitations as UIInvitation[];
   const invitedGuestIds = useMemo(() => new Set(uiInvitations.map((inv) => inv.guestId)), [uiInvitations]);
   const batchCandidates = useMemo(
     () => rosterGuests.filter((guest) => !invitedGuestIds.has(guest.id)),
     [rosterGuests, invitedGuestIds]
+  );
+  const whatsappTemplates = useMemo(
+    () => templates.filter((template) => template.channel === 'whatsapp' && template.isActive),
+    [templates]
+  );
+  const guestById = useMemo(() => new Map(rosterGuests.map((guest) => [guest.id, guest])), [rosterGuests]);
+  const sendTargetGuests = useMemo(
+    () => sendTargetIds.map((guestId) => guestById.get(guestId)).filter(Boolean),
+    [sendTargetIds, guestById]
+  );
+  const missingTargetPhones = useMemo(
+    () => sendTargetGuests.filter((guest) => !guest?.phone?.trim()),
+    [sendTargetGuests]
   );
 
   /* ── Filtering ──────────────────────────────────── */
@@ -209,13 +228,60 @@ export default function Undangan() {
     setBatchStep(1);
     setBatchGuests([]);
     setBatchChannel('whatsapp');
+    setBatchTemplateId(whatsappTemplates[0]?.id || '');
     setBatchModalOpen(true);
   };
 
   const sendBatch = async () => {
-    await batchCreate(batchGuests, batchChannel);
+    if (batchChannel === 'whatsapp') {
+      if (!batchTemplateId) {
+        toast.error('Belum ada template WhatsApp aktif');
+        return;
+      }
+      const missing = batchCandidates.filter((guest) => batchGuests.includes(guest.id) && !guest.phone?.trim());
+      if (missing.length > 0) {
+        toast.error(`Nomor WhatsApp belum diisi untuk ${missing.length} tamu`);
+        return;
+      }
+    }
+    const created = await batchCreate(batchGuests, batchChannel, batchTemplateId);
+    if (created.length === 0) return;
+    if (batchChannel === 'whatsapp') {
+      try {
+        await sendWhatsApp({
+          guest_ids: created.map((invitation) => invitation.guestId),
+          template_id: batchTemplateId,
+        });
+        toast.success(`${created.length} WhatsApp berhasil dikirim`);
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Gagal mengirim WhatsApp');
+      }
+    } else {
+      toast.success(`${created.length} undangan berhasil dibuat`);
+    }
     setBatchModalOpen(false);
     setBatchGuests([]);
+  };
+
+  const openSendModal = (guestIds: string[]) => {
+    setSendTargetIds(guestIds);
+    setSendTemplateId(whatsappTemplates[0]?.id || '');
+    setSendModalOpen(true);
+  };
+
+  const handleSendSelectedWhatsApp = async () => {
+    if (missingTargetPhones.length > 0) {
+      toast.error(`Nomor WhatsApp belum diisi untuk ${missingTargetPhones.length} tamu`);
+      return;
+    }
+    try {
+      await sendWhatsApp({ guest_ids: sendTargetIds, template_id: sendTemplateId });
+      toast.success(`${sendTargetIds.length} WhatsApp berhasil dikirim`);
+      setSendModalOpen(false);
+      setSelectedIds(new Set());
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Gagal mengirim WhatsApp');
+    }
   };
 
   /* ── Loading State ──────────────────────────────── */
@@ -277,6 +343,16 @@ export default function Undangan() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={selectedIds.size === 0}
+            onClick={() => openSendModal(uiInvitations.filter((inv) => selectedIds.has(inv.id)).map((inv) => inv.guestId))}
+            className="text-[#059669] border-[#a7f3d0] hover:bg-[#ecfdf5] disabled:opacity-40"
+          >
+            <MessageCircle size={16} />
+            <span className="hidden sm:inline">Kirim WhatsApp</span>
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -510,6 +586,15 @@ export default function Undangan() {
                           )}
                           {inv.status !== 'revoked' && (
                             <button
+                              onClick={() => openSendModal([inv.guestId])}
+                              className="p-1.5 rounded-md hover:bg-[#ecfdf5] text-[#64748b] hover:text-[#059669] transition-colors"
+                              title="Kirim WhatsApp"
+                            >
+                              <MessageCircle size={15} />
+                            </button>
+                          )}
+                          {inv.status !== 'revoked' && (
+                            <button
                               onClick={() => openRevokeModal(inv)}
                               className="p-1.5 rounded-md hover:bg-[#ffe4e6] text-[#64748b] hover:text-[#f43f5e] transition-colors"
                               title="Cabut Undangan"
@@ -532,6 +617,60 @@ export default function Undangan() {
           </div>
         )}
       </div>
+
+      {/* ── WhatsApp Send Modal ── */}
+      <Dialog open={sendModalOpen} onOpenChange={setSendModalOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Kirim WhatsApp</DialogTitle>
+            <DialogDescription>
+              Kirim pesan ke {sendTargetIds.length} tamu dari acara aktif.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {missingTargetPhones.length > 0 && (
+              <div className="rounded-lg border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-xs text-[#9a3412]">
+                {missingTargetPhones.length} tamu belum memiliki nomor WhatsApp. Lengkapi data tamu sebelum mengirim.
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">Template WhatsApp</label>
+              {whatsappTemplates.length > 0 ? (
+                <Select value={sendTemplateId} onValueChange={setSendTemplateId}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue placeholder="Pilih template WhatsApp" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {whatsappTemplates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="mt-1.5 rounded-lg bg-[#fff7ed] px-3 py-2 text-xs text-[#9a3412]">
+                  Belum ada template WhatsApp aktif. Buat template di menu Template Komunikasi.
+                </p>
+              )}
+            </div>
+            {sendTemplateId && (
+              <p className="rounded-lg bg-[#f8fafc] px-3 py-3 text-xs leading-5 text-[#64748b]">
+                {whatsappTemplates.find((template) => template.id === sendTemplateId)?.body}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSendModalOpen(false)}>Batal</Button>
+            <Button
+              onClick={handleSendSelectedWhatsApp}
+              disabled={!sendTemplateId || missingTargetPhones.length > 0 || isSendingWhatsApp}
+              className="gap-2"
+            >
+              {isSendingWhatsApp && <Loader2 size={14} className="animate-spin" />}
+              Kirim WhatsApp
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── QR Code Preview Modal ── */}
       <Dialog open={qrModalOpen} onOpenChange={setQrModalOpen}>
@@ -657,16 +796,19 @@ export default function Undangan() {
                 <label className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc] mb-2 block">
                   Template
                 </label>
-                <Select defaultValue="elegan">
+                <Select value={batchTemplateId} onValueChange={setBatchTemplateId}>
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue placeholder="Pilih template WhatsApp" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="elegan">Template Elegan</SelectItem>
-                    <SelectItem value="minimalis">Template Minimalis</SelectItem>
-                    <SelectItem value="modern">Template Modern</SelectItem>
+                    {whatsappTemplates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {whatsappTemplates.length === 0 && (
+                  <p className="text-xs text-[#b45309]">Belum ada template WhatsApp aktif.</p>
+                )}
               </div>
             </div>
           )}
@@ -680,7 +822,7 @@ export default function Undangan() {
                 {batchGuests.length} undangan akan dikirim
               </p>
               <p className="text-sm text-[#64748b]">
-                via {batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'} menggunakan Template Elegan
+                via {batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'} menggunakan {whatsappTemplates.find((template) => template.id === batchTemplateId)?.name || 'template terpilih'}
               </p>
             </div>
           )}

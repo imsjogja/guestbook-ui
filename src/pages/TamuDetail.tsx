@@ -27,9 +27,27 @@ import { id as idID } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { getGuestInitials } from '@/lib/normalizers';
 import { QRCodeSVG, downloadQRCodeSvg } from '@/components/QRCodeSVG';
-import { useEventAccess, useGuestDetail, useInvitations, useRSVP } from '@/hooks';
+import { useEventAccess, useGuestDetail, useInvitations, useRSVP, useTemplates, useWhatsAppMessaging } from '@/hooks';
 import { useTenantStore } from '@/store/tenantStore';
 import { toast } from 'sonner';
+import type { Template } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -107,10 +125,14 @@ export default function TamuDetail() {
     isLoading: isLoadingInvitations,
   } = useInvitations(currentEventId);
   const { rsvps, saveRSVPForGuest } = useRSVP(currentEventId);
+  const { templates } = useTemplates();
+  const { sendWhatsApp, isSending: isSendingWhatsApp } = useWhatsAppMessaging();
   const [showRsvpEdit, setShowRsvpEdit] = useState(false);
   const [selectedRsvpStatus, setSelectedRsvpStatus] = useState<EditableRSVPStatus>('attending');
   const [isSavingRsvp, setIsSavingRsvp] = useState(false);
   const [isCreatingInvitation, setIsCreatingInvitation] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [selectedWhatsAppTemplate, setSelectedWhatsAppTemplate] = useState('');
 
   const { guest, isLoading, error } = useGuestDetail(id);
   const invitation = useMemo(
@@ -127,6 +149,10 @@ export default function TamuDetail() {
   const invitationLabel = invitation ? `Tamu ${guest?.fullName ?? ''}` : 'Belum ada undangan';
   const canReadInvitations = access?.permissions.includes('invitation:read') ?? false;
   const canWriteInvitations = access?.permissions.includes('invitation:write') ?? false;
+  const whatsappTemplates = useMemo(
+    () => templates.filter((template: Template) => template.channel === 'whatsapp' && template.isActive),
+    [templates]
+  );
   const roleLabel: Record<string, string> = {
     tenant_owner: 'Tenant Owner',
     event_manager: 'Event Manager',
@@ -225,6 +251,26 @@ export default function TamuDetail() {
       toast.error(msg);
     } finally {
       setIsCreatingInvitation(false);
+    }
+  };
+
+  const openWhatsAppModal = () => {
+    if (!guest?.phone?.trim()) {
+      toast.error('Nomor WhatsApp tamu belum diisi');
+      return;
+    }
+    setSelectedWhatsAppTemplate(whatsappTemplates[0]?.id || '');
+    setIsWhatsAppModalOpen(true);
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!guest) return;
+    try {
+      await sendWhatsApp({ guest_ids: [guest.id], template_id: selectedWhatsAppTemplate });
+      toast.success('WhatsApp berhasil dikirim');
+      setIsWhatsAppModalOpen(false);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Gagal mengirim WhatsApp');
     }
   };
 
@@ -557,12 +603,16 @@ export default function TamuDetail() {
                   Ubah Status RSVP
                 </button>
                 <button
-                  onClick={() => toast.info('Pengiriman reminder belum dihubungkan ke backend')}
-                  className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors"
+                  onClick={openWhatsAppModal}
+                  disabled={!guest?.phone?.trim()}
+                  className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send size={15} />
-                  Kirim Reminder
+                  Kirim WhatsApp
                 </button>
+                {!guest?.phone?.trim() && (
+                  <p className="basis-full text-xs text-[#b45309]">Isi nomor WhatsApp tamu terlebih dahulu untuk mengaktifkan pengiriman.</p>
+                )}
               </div>
             </div>
           </motion.div>
@@ -851,6 +901,56 @@ export default function TamuDetail() {
           </div>
         </div>
       )}
+
+      <Dialog open={isWhatsAppModalOpen} onOpenChange={setIsWhatsAppModalOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Kirim WhatsApp</DialogTitle>
+            <DialogDescription>
+              Kirim pesan ke {guest?.fullName || 'tamu'} melalui provider WhatsApp yang terhubung.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">Nomor tujuan</label>
+              <p className="mt-1 text-sm text-[#64748b]">{guest?.phone || 'Nomor belum diisi'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">Template</label>
+              {whatsappTemplates.length > 0 ? (
+                <Select value={selectedWhatsAppTemplate} onValueChange={setSelectedWhatsAppTemplate}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue placeholder="Pilih template WhatsApp" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {whatsappTemplates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="mt-1.5 rounded-lg bg-[#fff7ed] px-3 py-2 text-xs text-[#9a3412]">
+                  Belum ada template WhatsApp aktif. Buat template di menu Template Komunikasi.
+                </p>
+              )}
+            </div>
+            {selectedWhatsAppTemplate && (
+              <Textarea
+                readOnly
+                value={whatsappTemplates.find((template) => template.id === selectedWhatsAppTemplate)?.body || ''}
+                className="min-h-[120px] bg-[#f8fafc] text-sm"
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsWhatsAppModalOpen(false)}>Batal</Button>
+            <Button onClick={handleSendWhatsApp} disabled={!selectedWhatsAppTemplate || isSendingWhatsApp} className="gap-2">
+              {isSendingWhatsApp && <Loader2 size={14} className="animate-spin" />}
+              Kirim WhatsApp
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

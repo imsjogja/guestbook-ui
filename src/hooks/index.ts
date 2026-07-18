@@ -11,4 +11,5 @@ export { useSeating } from './useSeating';
 export { useTemplates } from './useTemplates';
 export { useCampaigns } from './useCampaigns';
 export { useMessages } from './useMessages';
+export { useWhatsAppMessaging } from './useWhatsAppMessaging';
 export { useTeam } from './useTeam';

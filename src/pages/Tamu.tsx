@@ -21,6 +21,7 @@ import {
 import { cn } from '@/lib/utils';
 import { getGuestInitials } from '@/lib/normalizers';
 import { useGuests } from '@/hooks/useGuests';
+import { useTemplates, useWhatsAppMessaging } from '@/hooks';
 import type { Guest } from '@/types';
 import { toast } from 'sonner';
 import { useTenantStore } from '@/store/tenantStore';
@@ -88,6 +89,8 @@ export default function Tamu() {
     downloadTemplateCSV,
     exportGuestsCSV,
   } = useGuests(currentEventId);
+  const { templates } = useTemplates();
+  const { sendWhatsApp, isSending: isSendingWhatsApp } = useWhatsAppMessaging();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [segmentFilter, setSegmentFilter] = useState<string>('all');
@@ -112,6 +115,11 @@ export default function Tamu() {
   const [showEdit, setShowEdit] = useState(false);
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
   const [deletingGuest, setDeletingGuest] = useState<Guest | null>(null);
+
+  const whatsappTemplate = useMemo(
+    () => templates.find((template) => template.channel === 'whatsapp' && template.isActive),
+    [templates]
+  );
 
   /* Add form */
   const [formName, setFormName] = useState('');
@@ -266,6 +274,24 @@ export default function Tamu() {
       setErrorToast(msg);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleGuestWhatsApp = async (guest: Guest) => {
+    setDropdownOpen(null);
+    if (!guest.phone?.trim()) {
+      toast.error('Nomor WhatsApp tamu belum diisi');
+      return;
+    }
+    if (!whatsappTemplate) {
+      toast.error('Belum ada template WhatsApp aktif');
+      return;
+    }
+    try {
+      await sendWhatsApp({ guest_ids: [guest.id], template_id: whatsappTemplate.id });
+      toast.success(`WhatsApp untuk ${guest.fullName} berhasil dikirim`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Gagal mengirim WhatsApp');
     }
   };
 
@@ -589,6 +615,10 @@ export default function Tamu() {
                                           className="w-full text-left px-3 py-2 text-sm text-[#64748b] hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors">Lihat Detail</button>
                                         <button onClick={() => openEdit(g)}
                                           className="w-full text-left px-3 py-2 text-sm text-[#64748b] hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors">Ubah Tamu</button>
+                                        <button onClick={() => handleGuestWhatsApp(g)} disabled={isSendingWhatsApp}
+                                          className="w-full text-left px-3 py-2 text-sm text-[#059669] hover:bg-[#ecfdf5] transition-colors disabled:opacity-50">
+                                          Kirim WhatsApp
+                                        </button>
                                         <div className="border-t border-[#e2e8f0] dark:border-[#334155] my-1" />
                                         <button onClick={() => openDelete(g)}
                                           className="w-full text-left px-3 py-2 text-sm text-[#f43f5e] hover:bg-[#ffe4e6]/50 transition-colors">Hapus</button>
