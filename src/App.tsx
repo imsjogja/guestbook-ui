@@ -17,6 +17,7 @@ import TemplateKomunikasi from './pages/TemplateKomunikasi';
 import KampanyeKomunikasi from './pages/KampanyeKomunikasi';
 import RiwayatPesan from './pages/RiwayatPesan';
 import Tim from './pages/Tim';
+import TimAcara from './pages/TimAcara';
 import Pengaturan from './pages/Pengaturan';
 
 function App() {
@@ -41,6 +42,7 @@ function App() {
         <Route path="komunikasi/kampanye" element={<KampanyeKomunikasi />} />
         <Route path="komunikasi/pesan" element={<RiwayatPesan />} />
         <Route path="tim" element={<Tim />} />
+        <Route path="tim-acara" element={<TimAcara />} />
         <Route path="pengaturan" element={<Pengaturan />} />
       </Route>
 

@@ -14,6 +14,7 @@ import {
   Megaphone,
   MessageSquare,
   Users2,
+  ShieldCheck,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -21,11 +22,14 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useEventAccess } from '@/hooks/useEventAccess';
+import { useTenantStore } from '@/store/tenantStore';
 
 interface NavItem {
   label: string;
   path: string;
   icon: React.ReactNode;
+  permission?: string;
 }
 
 interface NavGroup {
@@ -37,34 +41,35 @@ const navGroups: NavGroup[] = [
   {
     label: 'Utama',
     items: [
-      { label: 'Dasbor', path: '/', icon: <LayoutDashboard size={20} /> },
-      { label: 'Acara', path: '/acara', icon: <CalendarDays size={20} /> },
-      { label: 'Tamu', path: '/tamu', icon: <Users size={20} /> },
-      { label: 'Kelompok Keluarga', path: '/kelompok-keluarga', icon: <UserCircle size={20} /> },
+      { label: 'Dasbor', path: '/', icon: <LayoutDashboard size={20} />, permission: 'report:read' },
+      { label: 'Acara', path: '/acara', icon: <CalendarDays size={20} />, permission: 'event:read' },
+      { label: 'Tamu', path: '/tamu', icon: <Users size={20} />, permission: 'guest:read' },
+      { label: 'Kelompok Keluarga', path: '/kelompok-keluarga', icon: <UserCircle size={20} />, permission: 'guest:read' },
     ],
   },
   {
     label: 'Operasional',
     items: [
-      { label: 'Undangan', path: '/undangan', icon: <Mail size={20} /> },
-      { label: 'RSVP', path: '/rsvp', icon: <ClipboardCheck size={20} /> },
-      { label: 'Check-in', path: '/check-in', icon: <ScanLine size={20} /> },
-      { label: 'Tempat Duduk', path: '/tempat-duduk', icon: <Armchair size={20} /> },
+      { label: 'Undangan', path: '/undangan', icon: <Mail size={20} />, permission: 'invitation:read' },
+      { label: 'RSVP', path: '/rsvp', icon: <ClipboardCheck size={20} />, permission: 'rsvp:read' },
+      { label: 'Check-in', path: '/check-in', icon: <ScanLine size={20} />, permission: 'checkin:read' },
+      { label: 'Tempat Duduk', path: '/tempat-duduk', icon: <Armchair size={20} />, permission: 'seating:read' },
     ],
   },
   {
     label: 'Komunikasi',
     items: [
-      { label: 'Template', path: '/komunikasi/template', icon: <FileText size={20} /> },
-      { label: 'Kampanye', path: '/komunikasi/kampanye', icon: <Megaphone size={20} /> },
-      { label: 'Riwayat Pesan', path: '/komunikasi/pesan', icon: <MessageSquare size={20} /> },
+      { label: 'Template', path: '/komunikasi/template', icon: <FileText size={20} />, permission: 'communication:read' },
+      { label: 'Kampanye', path: '/komunikasi/kampanye', icon: <Megaphone size={20} />, permission: 'communication:read' },
+      { label: 'Riwayat Pesan', path: '/komunikasi/pesan', icon: <MessageSquare size={20} />, permission: 'communication:read' },
     ],
   },
   {
     label: 'Sistem',
     items: [
-      { label: 'Tim', path: '/tim', icon: <Users2 size={20} /> },
-      { label: 'Pengaturan', path: '/pengaturan', icon: <Settings size={20} /> },
+      { label: 'Tim', path: '/tim', icon: <Users2 size={20} />, permission: 'team:read' },
+      { label: 'Tim Acara', path: '/tim-acara', icon: <ShieldCheck size={20} />, permission: 'event_team:read' },
+      { label: 'Pengaturan', path: '/pengaturan', icon: <Settings size={20} />, permission: 'settings:read' },
     ],
   },
 ];
@@ -73,6 +78,8 @@ const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 export default function Sidebar() {
   const location = useLocation();
+  const currentEvent = useTenantStore((state) => state.currentEvent);
+  const { access, isLoading: isAccessLoading } = useEventAccess();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -97,6 +104,11 @@ export default function Sidebar() {
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
+  };
+
+  const canSee = (item: NavItem) => {
+    if (!item.permission || !currentEvent || isAccessLoading || !access) return true;
+    return access.permissions.includes(item.permission);
   };
 
   return (
@@ -164,7 +176,10 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 px-3">
-          {navGroups.map((group) => (
+          {navGroups.map((group) => {
+            const visibleItems = group.items.filter(canSee);
+            if (visibleItems.length === 0) return null;
+            return (
             <div key={group.label} className="mb-5 last:mb-0">
               {!collapsed && (
                 <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-[#94a3b8]">
@@ -172,7 +187,7 @@ export default function Sidebar() {
                 </p>
               )}
               <ul className="space-y-0.5">
-                {group.items.map((item) => {
+                {visibleItems.map((item) => {
                   const active = isActive(item.path);
                   return (
                     <li key={item.path}>
@@ -213,7 +228,8 @@ export default function Sidebar() {
                 })}
               </ul>
             </div>
-          ))}
+            );
+          })}
         </nav>
       </aside>
 
@@ -247,13 +263,16 @@ export default function Sidebar() {
 
             {/* Navigation */}
             <nav className="flex-1 overflow-y-auto py-4 px-3">
-              {navGroups.map((group) => (
+              {navGroups.map((group) => {
+                const visibleItems = group.items.filter(canSee);
+                if (visibleItems.length === 0) return null;
+                return (
                 <div key={group.label} className="mb-5 last:mb-0">
                   <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-[#94a3b8]">
                     {group.label}
                   </p>
                   <ul className="space-y-0.5">
-                    {group.items.map((item) => {
+                    {visibleItems.map((item) => {
                       const active = isActive(item.path);
                       return (
                         <li key={item.path}>
@@ -282,7 +301,8 @@ export default function Sidebar() {
                     })}
                   </ul>
                 </div>
-              ))}
+                );
+              })}
             </nav>
           </motion.aside>
         )}

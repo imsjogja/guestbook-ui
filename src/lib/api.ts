@@ -62,6 +62,17 @@ function resolveWorkspacePath(url: string, method?: string, data?: unknown) {
     }
   }
 
+  if (pathname === '/event-members' || pathname.startsWith('/event-members/')) {
+    if (!eventPrefix) return { url, method };
+    const memberPath = pathname.replace(/^\/event-members/, '/members');
+    return { url: `${eventPrefix}${memberPath}${query}`, method };
+  }
+
+  if (pathname === '/event-access') {
+    if (!eventPrefix) return { url, method };
+    return { url: `${eventPrefix}/members/access${query}`, method };
+  }
+
   if (pathname === '/events' || pathname.startsWith('/events/')) {
     if (pathname.endsWith('/publish') && lowerMethod === 'patch') {
       return { url: `${tenantPrefix}${pathname}${query}`, method: 'post' };

@@ -1,6 +1,8 @@
 export { useAuth } from './useAuth';
 export { useGuests } from './useGuests';
 export { useGuestDetail } from './useGuestDetail';
+export { useEventMembers } from './useEventMembers';
+export { useEventAccess } from './useEventAccess';
 export { useInvitations } from './useInvitations';
 export { useRSVP } from './useRSVP';
 export { useCheckin } from './useCheckin';

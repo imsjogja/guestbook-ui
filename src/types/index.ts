@@ -248,6 +248,30 @@ export interface TeamMember {
   permissions: Permission[];
 }
 
+export type EventRole = 'rsvp_officer' | 'registration_officer' | 'usher' | 'gift_officer' | 'viewer';
+
+export interface EventMember {
+  id: string;
+  tenantId: string;
+  eventId: string;
+  userId: string;
+  role: EventRole;
+  status: 'active' | 'inactive';
+  assignedAt: string;
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    avatarUrl?: string;
+  };
+}
+
+export interface EventAccess {
+  role: string;
+  scope: 'tenant' | 'event';
+  permissions: string[];
+}
+
 export type Permission =
   | 'events:read' | 'events:write' | 'events:delete'
   | 'guests:read' | 'guests:write' | 'guests:delete'
