@@ -10,6 +10,7 @@ type BackendEvent = {
   start_date: string;
   end_date?: string | null;
   capacity?: number | null;
+  guest_count?: number | null;
   cover_url?: string | null;
   created_at: string;
   updated_at: string;
@@ -203,9 +204,11 @@ function normalizeEventStatus(status?: string): Event['status'] {
     case 'draft':
       return 'draft';
     case 'published':
-      return 'active';
+    case 'active':
+      return 'published';
     case 'ongoing':
-      return 'paused';
+    case 'paused':
+      return 'ongoing';
     case 'completed':
       return 'completed';
     case 'archived':
@@ -229,6 +232,7 @@ export function normalizeEvent(raw: BackendEvent): Event {
     location: raw.description?.trim() || '',
     status: normalizeEventStatus(raw.status),
     capacity: raw.capacity ?? undefined,
+    guestCount: raw.guest_count ?? undefined,
     coverImage: raw.cover_url ?? undefined,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,

@@ -1,6 +1,53 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
-import type { Message, ApiResponse } from '@/types';
+import type { Message } from '@/types';
+
+type BackendMessage = {
+  id: string;
+  tenant_id: string;
+  campaign_id?: string | null;
+  guest_id: string;
+  event_id?: string | null;
+  channel: Message['channel'];
+  type?: string;
+  subject?: string | null;
+  body: string;
+  status: string;
+  sent_at?: string | null;
+  delivered_at?: string | null;
+  read_at?: string | null;
+  failed_at?: string | null;
+  error_message?: string | null;
+  external_id?: string | null;
+  provider_http_status?: number | null;
+  created_at: string;
+};
+
+function normalizeMessage(raw: BackendMessage): Message {
+  const status: Message['status'] = raw.status === 'queued' ? 'pending' :
+    raw.status === 'delivered' || raw.status === 'read' || raw.status === 'failed' || raw.status === 'sent'
+      ? raw.status
+      : 'pending';
+  return {
+    id: raw.id,
+    tenantId: raw.tenant_id,
+    campaignId: raw.campaign_id ?? undefined,
+    guestId: raw.guest_id,
+    eventId: raw.event_id ?? undefined,
+    channel: raw.channel,
+    direction: 'outbound',
+    status,
+    subject: raw.subject ?? undefined,
+    body: raw.body,
+    sentAt: raw.sent_at ?? undefined,
+    deliveredAt: raw.delivered_at ?? undefined,
+    readAt: raw.read_at ?? undefined,
+    failedReason: raw.error_message ?? undefined,
+    externalId: raw.external_id ?? undefined,
+    providerHttpStatus: raw.provider_http_status ?? undefined,
+    createdAt: raw.created_at,
+  };
+}
 
 export interface UseMessagesReturn {
   messages: Message[];
@@ -21,9 +68,10 @@ export function useMessages(eventId?: string): UseMessagesReturn {
     setError(null);
     try {
       const params = eventId ? { eventId } : {};
-      const res = await api.get<ApiResponse<Message[]> & { total?: number }>('/messages', { params });
-      setMessages(res.data.data || []);
-      setTotal(res.data.total || (res.data.data || []).length);
+      const res = await api.get<{ data: BackendMessage[]; meta?: { total?: number } }>('/messages', { params });
+      const normalized = (res.data.data || []).map(normalizeMessage);
+      setMessages(normalized);
+      setTotal(res.data.meta?.total || normalized.length);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal memuat pesan';
       setError(msg);

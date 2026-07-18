@@ -130,12 +130,14 @@ function getActivityMeta(type: Activity['type']) {
 
 function getEventStatusBadge(status: string) {
   switch (status) {
+    case 'published':
     case 'active':
-      return { label: 'Aktif', className: 'bg-[#d1fae5] text-[#10b981] border-[#a7f3d0]' };
+      return { label: 'Dipublikasikan', className: 'bg-[#d1fae5] text-[#10b981] border-[#a7f3d0]' };
     case 'draft':
       return { label: 'Draft', className: 'bg-[#fef3c7] text-[#f59e0b] border-[#fde68a]' };
+    case 'ongoing':
     case 'paused':
-      return { label: 'Dijeda', className: 'bg-[#fef3c7] text-[#b45309] border-[#fcd34d]' };
+      return { label: 'Sedang Berlangsung', className: 'bg-[#fef3c7] text-[#b45309] border-[#fcd34d]' };
     case 'archived':
       return { label: 'Diarsipkan', className: 'bg-[#f1f5f9] text-[#64748b] border-[#e2e8f0]' };
     default:
@@ -311,7 +313,7 @@ export default function Dashboard() {
 
   // Upcoming events from real data
   const upcomingEvents = eventsData
-    .filter((e) => e.status === 'active' || e.status === 'draft' || e.status === 'paused')
+    .filter((e) => e.status === 'published' || e.status === 'draft' || e.status === 'ongoing')
     .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
     .slice(0, 5)
     .map((e) => ({

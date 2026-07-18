@@ -84,8 +84,9 @@ export interface Event {
   endDate?: string;
   location: string;
   address?: string;
-  status: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled' | 'archived';
+  status: 'draft' | 'published' | 'ongoing' | 'completed' | 'cancelled' | 'archived';
   capacity?: number;
+  guestCount?: number;
   coverImage?: string;
   createdAt: string;
   updatedAt: string;
@@ -255,6 +256,8 @@ export interface Message {
   deliveredAt?: string;
   readAt?: string;
   failedReason?: string;
+  externalId?: string;
+  providerHttpStatus?: number;
   createdAt: string;
 }
 

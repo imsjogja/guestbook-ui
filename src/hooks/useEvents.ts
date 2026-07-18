@@ -27,9 +27,9 @@ type EventUpdatePayload = Partial<EventCreatePayload> & {
 
 function mapStatusToBackend(status?: Event['status']): EventUpdatePayload['status'] {
   switch (status) {
-    case 'active':
+    case 'published':
       return 'published';
-    case 'paused':
+    case 'ongoing':
       return 'ongoing';
     case 'archived':
       return 'archived';
@@ -78,24 +78,32 @@ export function useEvents() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchEvents = useCallback(async () => {
-    setIsLoading(true);
+  const fetchEvents = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     setError(null);
     try {
       const response = await api.get<ApiResponse<BackendEvent[]>>('/events');
-      setEvents((response.data.data ?? []).map(normalizeEvent));
+      const normalized = (response.data.data ?? []).map(normalizeEvent);
+      setEvents(normalized);
+      const currentEvent = useTenantStore.getState().currentEvent;
+      if (currentEvent) {
+        useTenantStore.getState().setCurrentEvent(normalized.find((event) => event.id === currentEvent.id) ?? null);
+      }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       const msg = axiosErr.response?.data?.message ?? 'Gagal memuat acara';
       setError(msg);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
+
+  const refetch = useCallback(() => fetchEvents(), [fetchEvents]);
+  const refreshSilently = useCallback(() => fetchEvents(true), [fetchEvents]);
 
   const createEvent = useCallback(
     async (data: Partial<Event>) => {
@@ -116,7 +124,7 @@ export function useEvents() {
   const updateEvent = useCallback(
     async (id: string, data: Partial<Event>) => {
       try {
-        const response = await api.put<ApiResponse<BackendEvent>>(`/events/${id}`, {
+        const response = await api.patch<ApiResponse<BackendEvent>>(`/events/${id}`, {
           ...(data.name ? { name: data.name } : {}),
           ...(data.eventType ? { type: data.eventType } : {}),
           ...(data.startDate ? { start_date: data.startDate } : {}),
@@ -127,6 +135,9 @@ export function useEvents() {
         } as EventUpdatePayload);
         const updated = normalizeEvent(response.data.data);
         setEvents((prev) => prev.map((e) => (e.id === id ? updated : e)));
+        if (useTenantStore.getState().currentEvent?.id === id) {
+          useTenantStore.getState().setCurrentEvent(updated);
+        }
         return updated;
       } catch (err: unknown) {
         const axiosErr = err as { response?: { data?: { message?: string } } };
@@ -168,7 +179,8 @@ export function useEvents() {
     events,
     isLoading,
     error,
-    refetch: fetchEvents,
+    refetch,
+    refreshSilently,
     createEvent,
     updateEvent,
     deleteEvent,

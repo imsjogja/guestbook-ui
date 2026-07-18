@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -28,9 +28,9 @@ const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 /* ─── Status Config ─── */
 const statusConfig: Record<string, { label: string; bg: string; text: string; border: string; dot: string }> = {
   draft: { label: 'Draft', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]', dot: '#94a3b8' },
-  active: { label: 'Aktif', bg: 'bg-[#d1fae5]', text: 'text-[#059669]', border: 'border-[#a7f3d0]', dot: '#10b981' },
+  published: { label: 'Dipublikasikan', bg: 'bg-[#d1fae5]', text: 'text-[#059669]', border: 'border-[#a7f3d0]', dot: '#10b981' },
   archived: { label: 'Diarsipkan', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]', dot: '#94a3b8' },
-  paused: { label: 'Dijeda', bg: 'bg-[#fef3c7]', text: 'text-[#b45309]', border: 'border-[#fcd34d]', dot: '#f59e0b' },
+  ongoing: { label: 'Sedang Berlangsung', bg: 'bg-[#fef3c7]', text: 'text-[#b45309]', border: 'border-[#fcd34d]', dot: '#f59e0b' },
   completed: { label: 'Selesai', bg: 'bg-[#dbeafe]', text: 'text-[#2563eb]', border: 'border-[#93c5fd]', dot: '#3b82f6' },
   cancelled: { label: 'Dibatalkan', bg: 'bg-[#ffe4e6]', text: 'text-[#e11d48]', border: 'border-[#fecdd3]', dot: '#f43f5e' },
 };
@@ -64,7 +64,7 @@ export default function Acara() {
   const navigate = useNavigate();
   const currentEvent = useTenantStore((state) => state.currentEvent);
   const setCurrentEvent = useTenantStore((state) => state.setCurrentEvent);
-  const { events, isLoading, error, createEvent, updateEvent, deleteEvent } = useEvents();
+  const { events, isLoading, error, createEvent, updateEvent, deleteEvent, refreshSilently } = useEvents();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('newest');
@@ -95,6 +95,16 @@ export default function Acara() {
   const [formCapacity, setFormCapacity] = useState('');
   const [formStatus, setFormStatus] = useState<string>('draft');
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
+
+  useEffect(() => {
+    const refresh = () => { void refreshSilently(); };
+    const interval = window.setInterval(refresh, 10000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [refreshSilently]);
 
   /* ─── Filtered events ─── */
   const filtered = useMemo(() => {
@@ -152,7 +162,9 @@ export default function Acara() {
         startDate: formDate ? new Date(formDate).toISOString() : new Date().toISOString(),
         location: formLocation,
         capacity: Number(formCapacity) || 0,
-        status: formStatus as Event['status'],
+        // A new event enters the business lifecycle as draft. Publishing or
+        // marking it ongoing is an explicit follow-up action.
+        status: 'draft',
       });
       setShowCreate(false);
     } catch (err: unknown) {
@@ -284,15 +296,17 @@ export default function Acara() {
           <select
             value={formStatus}
             onChange={(e) => setFormStatus(e.target.value)}
-            className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20"
+            disabled={showCreate}
+            className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20 disabled:bg-[#f8fafc] disabled:text-[#94a3b8]"
           >
             <option value="draft">Draft</option>
-            <option value="active">Aktif</option>
-            <option value="paused">Dijeda</option>
+            <option value="published">Dipublikasikan</option>
+            <option value="ongoing">Sedang Berlangsung</option>
             <option value="completed">Selesai</option>
             <option value="cancelled">Dibatalkan</option>
             <option value="archived">Diarsipkan</option>
           </select>
+          {showCreate && <p className="mt-1 text-[11px] text-[#94a3b8]">Acara baru dimulai sebagai Draft. Status dapat diubah setelah dibuat.</p>}
         </div>
       </div>
     </div>
@@ -369,9 +383,10 @@ export default function Acara() {
           >
             <option value="all">Semua Status</option>
             <option value="draft">Draft</option>
-            <option value="active">Aktif</option>
-            <option value="paused">Dijeda</option>
+            <option value="published">Dipublikasikan</option>
+            <option value="ongoing">Sedang Berlangsung</option>
             <option value="completed">Selesai</option>
+            <option value="cancelled">Dibatalkan</option>
             <option value="archived">Diarsipkan</option>
           </select>
           <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94a3b8] pointer-events-none" />
@@ -424,7 +439,8 @@ export default function Acara() {
                   <AnimatePresence>
                     {filtered.map((evt, i) => {
                       const s = statusConfig[evt.status] || statusConfig.draft;
-                      const rsvpPct = (evt.capacity ?? 0) > 0 ? Math.round((0 / (evt.capacity ?? 1)) * 100) : 0;
+                      const guestCount = evt.guestCount ?? 0;
+                      const guestPct = (evt.capacity ?? 0) > 0 ? Math.round((guestCount / (evt.capacity ?? 1)) * 100) : 0;
                       const eventTime = evt.startDate
                         ? format(new Date(evt.startDate), 'HH:mm', { locale: id }) + ' WIB'
                         : '-';
@@ -447,7 +463,7 @@ export default function Acara() {
                                 <p className="text-xs text-[#94a3b8] mt-0.5">{eventTime}</p>
                                 {currentEvent?.id === evt.id && (
                                   <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#4f46e5]">
-                                    <Check size={11} /> Acara aktif
+                                    <Check size={11} /> Konteks terpilih
                                   </span>
                                 )}
                               </div>
@@ -484,17 +500,17 @@ export default function Acara() {
                                   onClick={() => openEventGuests(evt)}
                                   className="hover:text-[#4f46e5] hover:underline transition-colors"
                                 >
-                                  0
+                                  {guestCount.toLocaleString('id-ID')}
                                 </button>
                               </div>
                               <div className="flex items-center gap-2">
                                 <div className="w-10 h-1.5 bg-[#e2e8f0] rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-[#4f46e5] rounded-full"
-                                    style={{ width: `${Math.min(rsvpPct, 100)}%` }}
+                                    style={{ width: `${Math.min(guestPct, 100)}%` }}
                                   />
                                 </div>
-                                <span className="text-[11px] text-[#94a3b8]">{rsvpPct}%</span>
+                                <span className="text-[11px] text-[#94a3b8]">{guestPct}% kapasitas</span>
                               </div>
                             </div>
                           </td>
@@ -508,10 +524,10 @@ export default function Acara() {
                                     ? 'bg-[#eef2ff] text-[#4f46e5] dark:bg-[rgba(79,70,229,0.15)]'
                                     : 'text-[#64748b] hover:bg-[#eef2ff] hover:text-[#4f46e5]'
                                 )}
-                                title={currentEvent?.id === evt.id ? 'Acara aktif' : 'Gunakan acara ini'}
+                                title={currentEvent?.id === evt.id ? 'Konteks terpilih' : 'Pilih konteks acara'}
                               >
                                 <Check size={14} />
-                                <span className="hidden xl:inline">{currentEvent?.id === evt.id ? 'Aktif' : 'Gunakan'}</span>
+                                <span className="hidden xl:inline">{currentEvent?.id === evt.id ? 'Terpilih' : 'Pilih konteks'}</span>
                               </button>
                               <button
                                 onClick={() => openEdit(evt)}

@@ -23,9 +23,11 @@ function formatEventDate(value: string) {
 
 function getStatusLabel(status: string) {
   switch (status) {
-    case 'active': return 'Aktif';
+    case 'published': return 'Dipublikasikan';
+    case 'active': return 'Dipublikasikan';
     case 'draft': return 'Draft';
-    case 'paused': return 'Dijeda';
+    case 'ongoing': return 'Sedang Berlangsung';
+    case 'paused': return 'Sedang Berlangsung';
     case 'completed': return 'Selesai';
     case 'archived': return 'Diarsipkan';
     default: return status;
@@ -73,7 +75,7 @@ export default function EventContextSelector({ className, prominent = false }: E
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        aria-label="Pilih konteks acara aktif"
+        aria-label="Pilih konteks acara"
         className={cn(
           'flex w-full items-center gap-2 rounded-xl border text-left transition-colors',
           prominent
@@ -90,7 +92,7 @@ export default function EventContextSelector({ className, prominent = false }: E
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[#64748b]">
-            Acara aktif
+            Konteks acara
           </span>
           <span className={cn(
             'block truncate font-semibold',
@@ -107,7 +109,7 @@ export default function EventContextSelector({ className, prominent = false }: E
           <div className="border-b border-[#e2e8f0] px-4 py-3 dark:border-[#334155]">
             <p className="text-sm font-semibold text-[#0f172a] dark:text-[#f8fafc]">Pilih konteks acara</p>
             <p className="mt-0.5 text-xs leading-relaxed text-[#64748b]">
-              Semua data operasional akan mengikuti acara yang dipilih.
+              Status acara menunjukkan lifecycle bisnis. Pilihan ini hanya menentukan data yang sedang dibuka.
             </p>
             <div className="relative mt-3">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]" />

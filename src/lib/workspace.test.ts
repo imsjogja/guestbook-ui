@@ -9,7 +9,7 @@ const eventA: Event = {
   eventType: 'wedding',
   startDate: '2026-07-18T00:00:00Z',
   location: 'Jakarta',
-  status: 'active',
+  status: 'published',
   updatedAt: '2026-07-01T00:00:00Z',
   createdAt: '2026-07-01T00:00:00Z',
 };
