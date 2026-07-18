@@ -764,7 +764,7 @@ export default function Undangan() {
             {qrInvitation && (
               <>
                 <div className="border-4 border-[#e2e8f0] dark:border-[#334155] rounded-2xl p-4 bg-white">
-                  <QRCodeSVG code={qrInvitation.qrCodeUrl || qrInvitation.id} size={200} />
+                  <QRCodeSVG code={qrInvitation.shortLink || qrInvitation.qrCodeUrl || qrInvitation.id} size={200} />
                 </div>
                 <p className="text-xs text-[#94a3b8] mt-3">Scan untuk check-in</p>
                 <div className="mt-4 text-center space-y-1">

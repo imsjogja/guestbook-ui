@@ -218,13 +218,17 @@ export default function TamuDetail() {
     }
   };
 
-  const handleDownloadQr = () => {
+  const handleDownloadQr = async () => {
     if (!guest || !invitationCode) {
       toast.error('QR code belum tersedia');
       return;
     }
 
-    downloadQRCodeSvg(invitationCode, `qr-guest-${guest.id}.svg`);
+    try {
+      await downloadQRCodeSvg(invitationCode, `qr-guest-${guest.id}.svg`);
+    } catch {
+      toast.error('Gagal membuat file QR');
+    }
   };
 
   const handleCopyInvitationLink = async () => {

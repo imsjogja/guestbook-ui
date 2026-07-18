@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser';
 import { cn } from '@/lib/utils';
 import { useCheckin, useEventAccess } from '@/hooks';
 import { useGuests } from '@/hooks';
@@ -71,6 +72,21 @@ function formatTimeAgo(dateStr: string): string {
   return `${Math.floor(diffHour / 24)} hari lalu`;
 }
 
+function getCameraErrorMessage(error: unknown): string {
+  if (error instanceof DOMException) {
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      return 'Izin kamera ditolak. Izinkan kamera untuk situs ini, lalu tekan Nyalakan Kamera lagi.';
+    }
+    if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      return 'Kamera tidak ditemukan pada perangkat ini.';
+    }
+    if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      return 'Kamera sedang digunakan aplikasi lain. Tutup aplikasi tersebut lalu coba lagi.';
+    }
+  }
+  return 'Kamera belum dapat digunakan. Pastikan halaman dibuka melalui HTTPS dan izin kamera tersedia.';
+}
+
 // ── Scanner Tab Component ────────────────────────────
 
 function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => void }) {
@@ -80,6 +96,12 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
   const [overlayTitle, setOverlayTitle] = useState('');
   const [overlayMessage, setOverlayMessage] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const scannerControlsRef = useRef<IScannerControls | null>(null);
+  const processingRef = useRef(false);
+  const lastTokenRef = useRef({ token: '', scannedAt: 0 });
   const overlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { scanToken } = useCheckin();
 
@@ -105,8 +127,8 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
     };
   }, []);
 
-  const handleScan = async () => {
-    const token = normalizeScanToken(scanInput);
+  const processScan = useCallback(async (rawValue: string) => {
+    const token = normalizeScanToken(rawValue);
     if (!token) {
       setOverlayTitle('Token kosong');
       setOverlayMessage('Tempel token QR, barcode, atau URL undangan terlebih dahulu.');
@@ -114,7 +136,15 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
       return;
     }
 
+    const now = Date.now();
+    if (processingRef.current || (lastTokenRef.current.token === token && now - lastTokenRef.current.scannedAt < 3000)) {
+      return;
+    }
+
+    processingRef.current = true;
+    lastTokenRef.current = { token, scannedAt: now };
     setIsScanning(true);
+    setScanInput(rawValue);
     try {
       await scanToken(token, `QR/barcode scan: ${token}`, 1);
       const label = token.length > 18 ? `${token.slice(0, 18)}…` : token;
@@ -130,8 +160,64 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
       setOverlay('error');
     } finally {
       setIsScanning(false);
+      processingRef.current = false;
     }
-  };
+  }, [onCheckinSuccess, scanToken]);
+
+  const handleScan = useCallback(() => {
+    void processScan(scanInput);
+  }, [processScan, scanInput]);
+
+  useEffect(() => {
+    if (!cameraOn || !videoRef.current) return;
+
+    let cancelled = false;
+    let controls: IScannerControls | null = null;
+    const reader = new BrowserMultiFormatReader();
+    const videoElement = videoRef.current;
+    setCameraError('');
+    setCameraReady(false);
+
+    const startCamera = async () => {
+      try {
+        controls = await reader.decodeFromConstraints(
+          { audio: false, video: { facingMode: { ideal: 'environment' } } },
+          videoElement,
+          (result) => {
+            if (cancelled || !result) return;
+            setCameraReady(true);
+            void processScan(result.getText());
+          },
+        );
+        if (!cancelled) {
+          scannerControlsRef.current = controls;
+          setCameraReady(true);
+        } else {
+          controls.stop();
+        }
+      } catch (error: unknown) {
+        if (cancelled) return;
+        setCameraReady(false);
+        setCameraError(getCameraErrorMessage(error));
+      }
+    };
+
+    void startCamera();
+    return () => {
+      cancelled = true;
+      controls?.stop();
+      scannerControlsRef.current?.stop();
+      scannerControlsRef.current = null;
+      const stream = videoElement.srcObject;
+      if (stream instanceof MediaStream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [cameraOn, processScan]);
+
+  useEffect(() => () => {
+    scannerControlsRef.current?.stop();
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -165,12 +251,15 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
                 <div className="absolute top-0 right-0 w-6 h-6 border-r-[3px] border-t-[3px] border-[#10b981] rounded-tr-sm" />
                 <div className="absolute bottom-0 left-0 w-6 h-6 border-l-[3px] border-b-[3px] border-[#10b981] rounded-bl-sm" />
                 <div className="absolute bottom-0 right-0 w-6 h-6 border-r-[3px] border-b-[3px] border-[#10b981] rounded-br-sm" />
-                <div className="absolute inset-0 flex items-center justify-center">
+                {cameraOn && <video ref={videoRef} autoPlay muted playsInline className="absolute inset-0 h-full w-full rounded-xl object-cover" />}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                   <div className="text-center px-6">
-                    <ScanLine size={44} className="mx-auto text-white/80 mb-3" />
-                    <p className="text-white font-medium">Arahkan QR / Barcode ke kamera</p>
-                    <p className="text-white/60 text-xs mt-2">
-                      Atau tempel URL undangan / token hasil scan ke kolom bawah.
+                    {!cameraOn && <Camera size={44} className="mx-auto text-white/80 mb-3" />}
+                    <p className="text-white font-medium">
+                      {cameraOn ? 'Arahkan QR / Barcode ke kamera' : 'Kamera sedang dimatikan'}
+                    </p>
+                    <p className="text-white/70 text-xs mt-2">
+                      {cameraError || (cameraReady ? 'QR akan diproses otomatis saat terbaca.' : 'Menyiapkan kamera...')}
                     </p>
                   </div>
                 </div>
@@ -180,7 +269,13 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
                   transition={{ duration: 2, ease: 'linear', repeat: isScanning ? Infinity : 0 }}
                 />
               </div>
-            </div>
+              </div>
+
+              {cameraError && (
+                <p className="mt-3 rounded-lg border border-[#fda4af]/30 bg-[#f43f5e]/10 px-3 py-2 text-center text-xs text-[#fecdd3]">
+                  {cameraError}
+                </p>
+              )}
 
             <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -192,14 +287,14 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      void handleScan();
+                      handleScan();
                     }
                   }}
                 />
                 <Button
                   type="button"
                   className="h-11 bg-[#10b981] hover:bg-[#059669] text-white gap-2"
-                  onClick={() => void handleScan()}
+                  onClick={handleScan}
                   disabled={isScanning}
                 >
                   {isScanning ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
