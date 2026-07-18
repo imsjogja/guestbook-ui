@@ -61,6 +61,16 @@ interface UIInvitation {
   updatedAt?: string;
 }
 
+type SendResult = {
+  data?: Array<{ status?: string }>;
+};
+
+function countFailedMessages(result: unknown): number {
+  if (!result || typeof result !== 'object' || !('data' in result)) return 0;
+  const messages = (result as SendResult).data;
+  return Array.isArray(messages) ? messages.filter((message) => message.status === 'failed').length : 0;
+}
+
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 /* ── Status Config ─────────────────────────────────── */
@@ -111,7 +121,7 @@ const statusConfig: Record<
 
 export default function Undangan() {
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
-  const { invitations, isLoading, error, refetch, batchCreate, revokeInvitation, resendInvitation } = useInvitations(currentEventId);
+  const { invitations, isLoading, error, refetch, refresh, batchCreate, revokeInvitation, resendInvitation } = useInvitations(currentEventId);
   const { guests: rosterGuests } = useGuests(currentEventId);
   const { templates } = useTemplates();
   const { sendWhatsApp, isSending: isSendingWhatsApp } = useWhatsAppMessaging();
@@ -248,12 +258,19 @@ export default function Undangan() {
     if (created.length === 0) return;
     if (batchChannel === 'whatsapp') {
       try {
-        await sendWhatsApp({
+        const result = await sendWhatsApp({
           guest_ids: created.map((invitation) => invitation.guestId),
           template_id: batchTemplateId,
         });
-        toast.success(`${created.length} WhatsApp berhasil dikirim`);
+        await refresh();
+        const failedCount = countFailedMessages(result);
+        if (failedCount > 0) {
+          toast.error(`${failedCount} WhatsApp gagal dikirim; status tabel sudah diperbarui`);
+        } else {
+          toast.success(`${created.length} WhatsApp berhasil dikirim`);
+        }
       } catch (err: unknown) {
+        await refresh();
         toast.error(err instanceof Error ? err.message : 'Gagal mengirim WhatsApp');
       }
     } else {
@@ -275,11 +292,18 @@ export default function Undangan() {
       return;
     }
     try {
-      await sendWhatsApp({ guest_ids: sendTargetIds, template_id: sendTemplateId });
-      toast.success(`${sendTargetIds.length} WhatsApp berhasil dikirim`);
+      const result = await sendWhatsApp({ guest_ids: sendTargetIds, template_id: sendTemplateId });
+      await refresh();
+      const failedCount = countFailedMessages(result);
+      if (failedCount > 0) {
+        toast.error(`${failedCount} WhatsApp gagal dikirim; status tabel sudah diperbarui`);
+      } else {
+        toast.success(`${sendTargetIds.length} WhatsApp berhasil dikirim`);
+      }
       setSendModalOpen(false);
       setSelectedIds(new Set());
     } catch (err: unknown) {
+      await refresh();
       toast.error(err instanceof Error ? err.message : 'Gagal mengirim WhatsApp');
     }
   };

@@ -35,7 +35,8 @@ export interface UseInvitationsReturn {
   invitations: Invitation[];
   isLoading: boolean;
   error: string | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
+  refresh: () => Promise<void>;
   createInvitation: (data: Partial<Invitation> & { guestId?: string; guestIds?: string[]; expiresAt?: string }) => Promise<Invitation | null>;
   batchCreate: (guestIds: string[], channel: string, templateId?: string) => Promise<Invitation[]>;
   revokeInvitation: (id: string) => Promise<boolean>;
@@ -64,7 +65,7 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchInvitations = useCallback(async () => {
+  const fetchInvitations = useCallback(async (silent = false) => {
     if (!eventId) {
       setInvitations([]);
       setIsLoading(false);
@@ -72,22 +73,33 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    if (!silent) {
+      setIsLoading(true);
+      setError(null);
+    }
     try {
       const res = await api.get<ApiResponse<BackendInvitation[]>>('/invitations');
       setInvitations((res.data.data || []).map(normalizeInvitationResponse));
+      setError(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal memuat data undangan';
-      setError(msg);
+      // Keep the current table visible during a transient background refresh failure.
+      if (!silent) setError(msg);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [eventId]);
 
   useEffect(() => {
-    fetchInvitations();
-  }, [fetchInvitations]);
+    void fetchInvitations();
+    if (!eventId) return undefined;
+
+    const interval = window.setInterval(() => {
+      void fetchInvitations(true);
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [eventId, fetchInvitations]);
 
   const createInvitation = useCallback(async (data: Partial<Invitation> & { guestId?: string; guestIds?: string[]; expiresAt?: string }): Promise<Invitation | null> => {
     if (!eventId) {
@@ -163,6 +175,7 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
     isLoading,
     error,
     refetch: fetchInvitations,
+    refresh: () => fetchInvitations(true),
     createInvitation,
     batchCreate,
     revokeInvitation,
