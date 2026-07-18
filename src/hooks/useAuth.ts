@@ -17,11 +17,13 @@ export function useAuth() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
 
   const login = useCallback(
     async (data: LoginRequest) => {
       setIsLoading(true);
       setError(null);
+      setErrorCode(null);
       try {
         const response = await api.post<AuthResponse>('/auth/login', {
           email: data.email,
@@ -30,9 +32,11 @@ export function useAuth() {
         assertAuthResponse(response.data);
         const { access_token, refresh_token, user: userData } = response.data;
         storeLogin(access_token, refresh_token, userData);
+        setErrorCode(null);
         return response.data;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string; error?: string } } };
+        const axiosErr = err as { response?: { data?: { message?: string; error?: string; code?: string } } };
+        setErrorCode(axiosErr.response?.data?.code ?? null);
         const isNetworkError =
           !axiosErr.response ||
           (err instanceof Error && err.message === 'Network Error');
@@ -52,6 +56,7 @@ export function useAuth() {
     async (data: RegisterRequest) => {
       setIsLoading(true);
       setError(null);
+      setErrorCode(null);
       try {
         const response = await api.post<AuthResponse | RegistrationResponse>('/auth/register', {
           full_name: data.fullName,
@@ -91,6 +96,24 @@ export function useAuth() {
     },
     [storeLogin]
   );
+
+  const resendVerification = useCallback(async (email: string) => {
+    setIsLoading(true);
+    setError(null);
+    setErrorCode(null);
+    try {
+      await api.post('/auth/resend-verification', { email });
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      const message = axiosErr.response?.data?.message ?? (err instanceof Error && err.message === 'Network Error'
+        ? 'Tidak dapat terhubung ke server. Pastikan backend Docker aktif.'
+        : 'Email verifikasi gagal dikirim ulang.');
+      setError(message);
+      throw new Error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const requestPasswordReset = useCallback(async (email: string) => {
     setIsLoading(true);
@@ -143,11 +166,13 @@ export function useAuth() {
     isAuthenticated,
     isLoading,
     error,
+    errorCode,
     login,
     register,
     requestPasswordReset,
     requestMagicLink,
     consumeMagicLink,
+    resendVerification,
     logout,
   };
 }

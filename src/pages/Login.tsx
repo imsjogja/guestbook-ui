@@ -15,7 +15,7 @@ const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, isLoading, error, requestPasswordReset, requestMagicLink } = useAuth();
+  const { login, isLoading, error, errorCode, requestPasswordReset, requestMagicLink, resendVerification } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -56,6 +56,20 @@ export default function Login() {
     try {
       await requestMagicLink(email);
       setEmailActionMessage('Jika akun tersedia dan sudah terverifikasi, link masuk sudah dikirim.');
+    } catch {
+      setShakeError(true);
+      setTimeout(() => setShakeError(false), 300);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      setEmailActionMessage('Isi email terlebih dahulu untuk mengirim ulang verifikasi.');
+      return;
+    }
+    try {
+      await resendVerification(email);
+      setEmailActionMessage('Jika akun tersedia dan belum terverifikasi, email verifikasi baru sudah dikirim.');
     } catch {
       setShakeError(true);
       setTimeout(() => setShakeError(false), 300);
@@ -155,6 +169,17 @@ export default function Login() {
               >
                 {error}
               </motion.div>
+            )}
+
+            {errorCode === 'EMAIL_NOT_VERIFIED' && (
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={isLoading}
+                className="-mt-2 mb-4 text-sm text-[#4f46e5] hover:underline disabled:opacity-60"
+              >
+                Kirim ulang email verifikasi
+              </button>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
