@@ -21,7 +21,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useTeam } from '@/hooks';
+import { useTeam, useTenantAccess } from '@/hooks';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -134,6 +134,7 @@ function getInitials(name?: string | null) {
 
 export default function Tim() {
   const { members, isLoading, error, refetch, inviteMember, updateRole, removeMember } = useTeam();
+  const { access, isLoading: isLoadingAccess } = useTenantAccess();
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isRoleManagerOpen, setIsRoleManagerOpen] = useState(false);
   const [isEditRoleOpen, setIsEditRoleOpen] = useState(false);
@@ -143,6 +144,20 @@ export default function Tim() {
 
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<TenantRole>('rsvp_officer');
+
+  const canManageTeam = access?.permissions.includes('team:write') ?? false;
+
+  const ensureCanManageTeam = () => {
+    if (isLoadingAccess) {
+      toast.info('Memeriksa akses pengelolaan tim');
+      return false;
+    }
+    if (!canManageTeam) {
+      toast.error('Hanya Tenant Owner yang dapat mengubah anggota dan peran tenant');
+      return false;
+    }
+    return true;
+  };
 
   const stats = {
     total: members.length,
@@ -154,6 +169,7 @@ export default function Tim() {
   };
 
   const handleSendInvite = async () => {
+    if (!ensureCanManageTeam()) return;
     if (!inviteEmail.trim() || !inviteEmail.includes('@')) {
       toast.error('Masukkan email yang valid');
       return;
@@ -181,6 +197,7 @@ export default function Tim() {
   };
 
   const handleDelete = async (member: TeamMember) => {
+    if (!ensureCanManageTeam()) return;
     if (member.role === 'tenant_owner') {
       toast.error('Peran Tenant Owner tidak dapat dihapus');
       return;
@@ -200,6 +217,7 @@ export default function Tim() {
   };
 
   const openEditRole = (member: TeamMember) => {
+    if (!ensureCanManageTeam()) return;
     if (member.role === 'tenant_owner') {
       toast.info('Peran Tenant Owner tidak dapat diubah');
       return;
@@ -209,6 +227,7 @@ export default function Tim() {
   };
 
   const handleSaveRole = async () => {
+    if (!ensureCanManageTeam()) return;
     if (!editingMember) return;
     setIsSubmitting(true);
     try {
@@ -264,6 +283,7 @@ export default function Tim() {
           </Button>
           <Button
             onClick={() => setIsInviteOpen(true)}
+            disabled={isLoadingAccess || !canManageTeam}
             className="h-10 gap-2 bg-[#4f46e5] hover:bg-[#6366f1] text-white"
           >
             <UserPlus size={16} />
@@ -271,6 +291,13 @@ export default function Tim() {
           </Button>
         </div>
       </div>
+
+      {!isLoadingAccess && !canManageTeam && (
+        <div className="flex items-start gap-3 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
+          <AlertTriangle size={17} className="mt-0.5 shrink-0" />
+          <p>Anda dapat melihat anggota dan katalog peran. Hanya Tenant Owner yang dapat mengundang anggota, mengubah peran, atau menonaktifkan akses.</p>
+        </div>
+      )}
 
       {/* Stats Bar */}
       <div className="flex flex-wrap gap-3">
@@ -391,14 +418,16 @@ export default function Tim() {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => openEditRole(member)}
-                              className="p-1.5 rounded-md text-[#64748b] hover:text-[#4f46e5] hover:bg-[#eef2ff] transition-colors"
-                              title="Ubah Peran"
+                              disabled={isLoadingAccess || !canManageTeam || member.role === 'tenant_owner'}
+                              className="p-1.5 rounded-md text-[#64748b] hover:text-[#4f46e5] hover:bg-[#eef2ff] transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#64748b]"
+                              title={member.role === 'tenant_owner' ? 'Role Tenant Owner tidak dapat diubah' : 'Ubah Peran'}
                             >
                               <Shield size={14} />
                             </button>
                             {member.role !== 'tenant_owner' && (
                               <button
                                 onClick={() => handleDelete(member)}
+                                disabled={isLoadingAccess || !canManageTeam}
                                 className="p-1.5 rounded-md text-[#64748b] hover:text-[#f43f5e] hover:bg-[#ffe4e6] transition-colors"
                                 title="Nonaktifkan"
                               >
@@ -627,7 +656,7 @@ export default function Tim() {
             </Button>
             <Button
               onClick={handleSaveRole}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoadingAccess || !canManageTeam || editingMember?.role === 'tenant_owner'}
               className="bg-[#4f46e5] hover:bg-[#6366f1] text-white"
             >
               {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}

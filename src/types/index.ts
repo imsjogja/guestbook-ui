@@ -51,6 +51,12 @@ export interface TenantSettings {
   notificationPreferences: NotificationPreferences;
 }
 
+export interface TenantAccess {
+  role: string;
+  scope: 'tenant';
+  permissions: string[];
+}
+
 export interface NotificationPreferences {
   emailEnabled: boolean;
   whatsappEnabled: boolean;
