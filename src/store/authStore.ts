@@ -9,13 +9,22 @@ function readStoredToken() {
   return raw;
 }
 
+function readStoredRefreshToken() {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('gf_refresh_token');
+  if (!raw || raw === 'undefined' || raw === 'null') return null;
+  return raw;
+}
+
 interface AuthState {
   accessToken: string | null;
+  refreshToken: string | null;
   user: User | null;
   isLoading: boolean;
   error: string | null;
 
-  login: (token: string, user: User) => void;
+  login: (token: string, refreshToken: string, user: User) => void;
+  updateTokens: (accessToken: string, refreshToken: string) => void;
   logout: () => void;
   setUser: (user: User | null) => void;
   setLoading: (loading: boolean) => void;
@@ -25,6 +34,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   accessToken: readStoredToken(),
+  refreshToken: readStoredRefreshToken(),
   user: (() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -37,18 +47,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  login: (token: string, user: User) => {
+  login: (token: string, refreshToken: string, user: User) => {
     localStorage.setItem('gf_access_token', token);
+    localStorage.setItem('gf_refresh_token', refreshToken);
     localStorage.setItem('gf_user', JSON.stringify(user));
-    set({ accessToken: token, user, error: null });
+    set({ accessToken: token, refreshToken, user, error: null });
+  },
+
+  updateTokens: (accessToken: string, refreshToken: string) => {
+    localStorage.setItem('gf_access_token', accessToken);
+    localStorage.setItem('gf_refresh_token', refreshToken);
+    set({ accessToken, refreshToken });
   },
 
   logout: () => {
     localStorage.removeItem('gf_access_token');
+    localStorage.removeItem('gf_refresh_token');
     localStorage.removeItem('gf_user');
     useTenantStore.getState().setTenant(null);
     useTenantStore.getState().setCurrentEvent(null);
-    set({ accessToken: null, user: null, error: null });
+    set({ accessToken: null, refreshToken: null, user: null, error: null });
   },
 
   setUser: (user: User | null) => {

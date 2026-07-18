@@ -1,6 +1,7 @@
-import axios from 'axios';
+import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/store/authStore';
 import { useTenantStore } from '@/store/tenantStore';
+import type { AuthResponse } from '@/types';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1',
@@ -9,6 +10,41 @@ const api = axios.create({
   },
   timeout: 30000,
 });
+
+type RetryableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = useAuthStore.getState().refreshToken;
+  if (!refreshToken) return null;
+
+  if (!refreshPromise) {
+    refreshPromise = api
+      .post<AuthResponse>('/auth/refresh', { refresh_token: refreshToken })
+      .then((response) => {
+        const { access_token, refresh_token } = response.data;
+        if (!access_token || !refresh_token) {
+          throw new Error('Refresh response is incomplete');
+        }
+        useAuthStore.getState().updateTokens(access_token, refresh_token);
+        return access_token;
+      })
+      .catch(() => null)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+}
+
+function expireSession() {
+  useAuthStore.getState().logout();
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
+}
 
 function splitUrl(url: string) {
   const [pathname, query = ''] = url.split('?');
@@ -230,16 +266,27 @@ api.interceptors.request.use(
 // Response interceptor: handle 401 unauthorized
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const url = error.config?.url ?? '';
     const isAuthRoute =
       url.includes('/auth/login') ||
       url.includes('/auth/register') ||
       url.includes('/auth/refresh');
+    const originalRequest = error.config as RetryableRequestConfig | undefined;
+    const hasSession = !!useAuthStore.getState().accessToken;
 
-    if (error.response?.status === 401 && !isAuthRoute) {
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
+    if (error.response?.status === 401 && !isAuthRoute && hasSession && originalRequest) {
+      if (originalRequest._retry) {
+        expireSession();
+      } else {
+        originalRequest._retry = true;
+        const accessToken = await refreshAccessToken();
+        if (accessToken) {
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return api.request(originalRequest);
+        }
+        expireSession();
+      }
     }
     return Promise.reject(error);
   }

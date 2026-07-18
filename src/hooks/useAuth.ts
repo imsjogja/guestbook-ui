@@ -4,7 +4,7 @@ import api from '@/lib/api';
 import type { AuthResponse, LoginRequest, RegisterRequest } from '@/types';
 
 function assertAuthResponse(response: AuthResponse) {
-  if (!response?.access_token || !response?.user?.id) {
+  if (!response?.access_token || !response?.refresh_token || !response?.user?.id) {
     throw new Error('Respons login tidak valid');
   }
 }
@@ -28,8 +28,8 @@ export function useAuth() {
           password: data.password,
         });
         assertAuthResponse(response.data);
-        const { access_token, user: userData } = response.data;
-        storeLogin(access_token, userData);
+        const { access_token, refresh_token, user: userData } = response.data;
+        storeLogin(access_token, refresh_token, userData);
         return response.data;
       } catch (err: unknown) {
         const axiosErr = err as { response?: { data?: { message?: string; error?: string } } };
@@ -60,8 +60,8 @@ export function useAuth() {
           tenant_subdomain: data.tenantSubdomain,
         });
         assertAuthResponse(response.data);
-        const { access_token, user: userData } = response.data;
-        storeLogin(access_token, userData);
+        const { access_token, refresh_token, user: userData } = response.data;
+        storeLogin(access_token, refresh_token, userData);
         return response.data;
       } catch (err: unknown) {
         const axiosErr = err as { response?: { data?: { message?: string; error?: string; errors?: Record<string, string[]> } } };
