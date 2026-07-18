@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useCheckin } from '@/hooks';
+import { useCheckin, useEventAccess } from '@/hooks';
 import { useGuests } from '@/hooks';
 import {
   ScanLine,
@@ -688,6 +688,7 @@ export default function Checkin() {
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   const { checkins, stats, isLoading, error, refetch } = useCheckin();
+  const { access, isLoading: isLoadingAccess } = useEventAccess();
 
   const handleCheckinSuccess = useCallback((_name: string) => {
     // Trigger a refetch after a short delay to get updated data
@@ -706,6 +707,18 @@ export default function Checkin() {
           <RefreshCw size={16} />
           Coba Lagi
         </Button>
+      </div>
+    );
+  }
+
+  if (!isLoadingAccess && !access?.permissions.includes('checkin:read')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <AlertCircle size={48} className="text-[#f59e0b] mb-4" />
+        <p className="text-[#0f172a] dark:text-[#f8fafc] font-medium mb-2">Akses check-in terbatas</p>
+        <p className="text-sm text-[#64748b] max-w-md">
+          Role Anda tidak memiliki izin melihat atau memproses check-in. Gunakan Registration Officer, Usher, Event Manager, atau Tenant Owner.
+        </p>
       </div>
     );
   }

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
-import type { TeamMember, ApiResponse, User, Permission } from '@/types';
+import type { TeamMember, ApiResponse, User, Permission, TenantRole } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
 
-type TeamRole = 'owner' | 'admin' | 'editor' | 'viewer';
+export type TeamRole = TenantRole;
 
 interface BackendTeamMember {
   id: string;
@@ -19,6 +19,7 @@ interface BackendTeamMember {
     updatedAt: string;
   };
   role: string;
+  roleKey?: string;
   invitedBy?: string;
   invitedAt?: string;
   acceptedAt?: string;
@@ -31,47 +32,23 @@ export interface UseTeamReturn {
   isLoading: boolean;
   error: string | null;
   refetch: () => void;
-  inviteMember: (data: { email: string; role: TeamRole; message?: string }) => Promise<boolean>;
+  inviteMember: (data: { email: string; role: TeamRole }) => Promise<boolean>;
   updateRole: (id: string, role: TeamRole) => Promise<boolean>;
   removeMember: (id: string) => Promise<boolean>;
 }
 
 const emptyPermissions: Permission[] = [];
 
-function toUIRole(role: string): TeamRole {
-  switch (role) {
-    case 'tenant_owner':
-      return 'owner';
-    case 'event_manager':
-      return 'admin';
-    case 'rsvp_officer':
-    case 'registration_officer':
-      return 'editor';
-    case 'usher':
-    case 'gift_officer':
-    case 'viewer':
-    default:
-      return 'viewer';
-  }
-}
-
-function toBackendRole(role: TeamRole): string {
-  switch (role) {
-    case 'owner':
-      return 'tenant_owner';
-    case 'admin':
-      return 'event_manager';
-    case 'editor':
-      return 'rsvp_officer';
-    case 'viewer':
-    default:
-      return 'viewer';
-  }
+function getApiError(err: unknown, fallback: string): string {
+  const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+  return axiosErr.response?.data?.error
+    ?? axiosErr.response?.data?.message
+    ?? (err instanceof Error ? err.message : fallback);
 }
 
 function mapUser(user: BackendTeamMember['user'], role: TeamRole): User {
   const userRole: User['role'] =
-    role === 'owner' ? 'admin' : role === 'admin' ? 'admin' : role === 'editor' ? 'editor' : 'viewer';
+    role === 'tenant_owner' || role === 'event_manager' ? 'admin' : role === 'viewer' ? 'viewer' : 'editor';
 
   return {
     id: user.id,
@@ -84,15 +61,36 @@ function mapUser(user: BackendTeamMember['user'], role: TeamRole): User {
   };
 }
 
+function normalizeTeamRole(role: string): TeamRole {
+  switch (role) {
+    case 'tenant_owner':
+    case 'event_manager':
+    case 'rsvp_officer':
+    case 'registration_officer':
+    case 'usher':
+    case 'gift_officer':
+    case 'viewer':
+      return role;
+    case 'owner':
+      return 'tenant_owner';
+    case 'admin':
+      return 'event_manager';
+    case 'editor':
+      return 'rsvp_officer';
+    default:
+      return 'viewer';
+  }
+}
+
 function mapMember(member: BackendTeamMember): TeamMember {
-  const uiRole = toUIRole(member.role);
+  const role = normalizeTeamRole(member.roleKey ?? member.role);
 
   return {
     id: member.userId,
     tenantId: member.tenantId,
     userId: member.userId,
-    user: mapUser(member.user, uiRole),
-    role: uiRole,
+    user: mapUser(member.user, role),
+    role,
     invitedBy: member.invitedBy || '',
     invitedAt: member.invitedAt || '',
     acceptedAt: member.acceptedAt || undefined,
@@ -123,8 +121,7 @@ export function useTeam(): UseTeamReturn {
       const data = res.data.data || [];
       setMembers(data.map(mapMember));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memuat anggota tim';
-      setError(msg);
+      setError(getApiError(err, 'Gagal memuat anggota tim'));
     } finally {
       setIsLoading(false);
     }
@@ -135,7 +132,7 @@ export function useTeam(): UseTeamReturn {
   }, [fetchMembers]);
 
   const inviteMember = useCallback(
-    async (data: { email: string; role: TeamRole; message?: string }): Promise<boolean> => {
+    async (data: { email: string; role: TeamRole }): Promise<boolean> => {
       if (!currentTenantId) {
         setError('Tenant belum dipilih');
         return false;
@@ -144,15 +141,14 @@ export function useTeam(): UseTeamReturn {
       try {
         await api.post('/team/invite', {
           email: data.email,
-          role: toBackendRole(data.role),
-          message: data.message,
+          role: data.role,
         });
         await fetchMembers();
         return true;
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Gagal mengundang anggota';
+        const msg = getApiError(err, 'Gagal mengundang anggota');
         setError(msg);
-        return false;
+        throw new Error(msg);
       }
     },
     [currentTenantId, fetchMembers]
@@ -166,13 +162,13 @@ export function useTeam(): UseTeamReturn {
       }
 
       try {
-        await api.patch(`/team/${id}/role`, { role: toBackendRole(role) });
+        await api.patch(`/team/${id}/role`, { role });
         await fetchMembers();
         return true;
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Gagal memperbarui peran';
+        const msg = getApiError(err, 'Gagal memperbarui peran');
         setError(msg);
-        return false;
+        throw new Error(msg);
       }
     },
     [currentTenantId, fetchMembers]
@@ -190,9 +186,9 @@ export function useTeam(): UseTeamReturn {
         await fetchMembers();
         return true;
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Gagal menghapus anggota';
+        const msg = getApiError(err, 'Gagal menghapus anggota');
         setError(msg);
-        return false;
+        throw new Error(msg);
       }
     },
     [currentTenantId, fetchMembers]

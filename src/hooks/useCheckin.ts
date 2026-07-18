@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { Checkin } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
+import { useEventAccess } from './useEventAccess';
 
 interface CheckinStats {
   totalToday: number;
@@ -83,6 +84,7 @@ function normalizeStats(data?: ApiCheckinStats): CheckinStats {
 export function useCheckin(eventId?: string) {
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
   const activeEventId = eventId ?? currentEventId;
+  const { access, isLoading: isLoadingAccess } = useEventAccess();
   const [checkins, setCheckins] = useState<Checkin[]>([]);
   const [stats, setStats] = useState<CheckinStats>({
     totalToday: 0,
@@ -94,6 +96,19 @@ export function useCheckin(eventId?: string) {
 
   const fetchCheckins = useCallback(async () => {
     if (!activeEventId) {
+      setCheckins([]);
+      setStats({ totalToday: 0, total: 0, byMethod: { qr: 0, manual: 0, walkIn: 0 } });
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    if (isLoadingAccess) {
+      setIsLoading(true);
+      return;
+    }
+
+    if (!access?.permissions.includes('checkin:read')) {
       setCheckins([]);
       setStats({ totalToday: 0, total: 0, byMethod: { qr: 0, manual: 0, walkIn: 0 } });
       setError(null);
@@ -132,7 +147,7 @@ export function useCheckin(eventId?: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [activeEventId]);
+  }, [access, activeEventId, isLoadingAccess]);
 
   useEffect(() => {
     fetchCheckins();
@@ -147,6 +162,9 @@ export function useCheckin(eventId?: string) {
     ) => {
       if (!activeEventId) {
         throw new Error('Event aktif belum dipilih');
+      }
+      if (isLoadingAccess || !access?.permissions.includes('checkin:write')) {
+        throw new Error('Role Anda tidak memiliki akses untuk melakukan check-in');
       }
 
       try {
@@ -168,13 +186,16 @@ export function useCheckin(eventId?: string) {
         throw new Error(axiosErr.response?.data?.message ?? 'Gagal melakukan check-in');
       }
     },
-    [activeEventId]
+    [access, activeEventId, isLoadingAccess]
   );
 
   const scanToken = useCallback(
     async (token: string, notes?: string, actualPax = 1) => {
       if (!activeEventId) {
         throw new Error('Event aktif belum dipilih');
+      }
+      if (isLoadingAccess || !access?.permissions.includes('checkin:write')) {
+        throw new Error('Role Anda tidak memiliki akses untuk melakukan check-in');
       }
 
       try {
@@ -195,7 +216,7 @@ export function useCheckin(eventId?: string) {
         throw new Error(axiosErr.response?.data?.message ?? 'Gagal memindai QR');
       }
     },
-    [activeEventId]
+    [access, activeEventId, isLoadingAccess]
   );
 
   const walkIn = useCallback(
@@ -209,6 +230,10 @@ export function useCheckin(eventId?: string) {
       notes?: string;
       eventId?: string;
     }) => {
+      if (isLoadingAccess || !access?.permissions.includes('checkin:write')) {
+        throw new Error('Role Anda tidak memiliki akses untuk melakukan check-in');
+      }
+
       try {
         const response = await api.post<{ data: Checkin }>('/checkins/walk-in', {
           full_name: data.fullName,
@@ -228,7 +253,7 @@ export function useCheckin(eventId?: string) {
         throw new Error(axiosErr.response?.data?.message ?? 'Gagal mendaftarkan walk-in');
       }
     },
-    [activeEventId]
+    [access, activeEventId, isLoadingAccess]
   );
 
   return {

@@ -235,12 +235,21 @@ export interface Message {
 
 // ── Team ──────────────────────────────────────────────
 
+export type TenantRole =
+  | 'tenant_owner'
+  | 'event_manager'
+  | 'rsvp_officer'
+  | 'registration_officer'
+  | 'usher'
+  | 'gift_officer'
+  | 'viewer';
+
 export interface TeamMember {
   id: string;
   tenantId: string;
   userId: string;
   user: User;
-  role: 'owner' | 'admin' | 'editor' | 'viewer';
+  role: TenantRole;
   invitedBy: string;
   invitedAt: string;
   acceptedAt?: string;

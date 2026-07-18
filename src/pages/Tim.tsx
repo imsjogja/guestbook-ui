@@ -5,13 +5,14 @@ import {
   Settings,
   Users,
   Shield,
-  Pencil,
   Eye,
   Clock,
-  Mail,
-  UserX,
   Trash2,
   Crown,
+  ScanLine,
+  ClipboardCheck,
+  Gift,
+  UserCog,
   X,
   CheckCircle2,
   AlertTriangle,
@@ -39,45 +40,87 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import type { TeamMember, TenantRole } from '@/types';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
-type TeamRole = 'owner' | 'admin' | 'editor' | 'viewer';
 type MemberStatus = 'active' | 'pending' | 'inactive';
 
-const roleConfig: Record<TeamRole, { label: string; className: string; icon: React.ReactNode }> = {
-  owner: { label: 'Owner', className: 'bg-[#4f46e5] text-white', icon: <Crown size={10} /> },
-  admin: { label: 'Admin', className: 'bg-[#6366f1] text-white', icon: <Shield size={10} /> },
-  editor: { label: 'Editor', className: 'bg-[#10b981] text-white', icon: <Pencil size={10} /> },
-  viewer: { label: 'Viewer', className: 'bg-[#f59e0b] text-white', icon: <Eye size={10} /> },
+const roleOptions: TenantRole[] = [
+  'event_manager',
+  'rsvp_officer',
+  'registration_officer',
+  'usher',
+  'gift_officer',
+  'viewer',
+];
+const allRoles: TenantRole[] = ['tenant_owner', ...roleOptions];
+
+const roleConfig: Record<TenantRole, { label: string; description: string; className: string; icon: React.ReactNode; can: string[]; cannot: string[] }> = {
+  tenant_owner: {
+    label: 'Tenant Owner',
+    description: 'Pemilik workspace dengan akses penuh.',
+    className: 'bg-[#4f46e5] text-white',
+    icon: <Crown size={10} />,
+    can: ['Akses penuh ke seluruh tenant', 'Mengelola anggota dan peran', 'Mengelola billing dan pengaturan'],
+    cannot: [],
+  },
+  event_manager: {
+    label: 'Event Manager',
+    description: 'Mengelola acara dan seluruh operasional acara.',
+    className: 'bg-[#6366f1] text-white',
+    icon: <Shield size={10} />,
+    can: ['Mengelola acara, tamu, RSVP, check-in, dan seating', 'Mengelola komunikasi dan laporan'],
+    cannot: ['Mengelola anggota tenant'],
+  },
+  rsvp_officer: {
+    label: 'RSVP Officer',
+    description: 'Mengelola undangan, RSVP, dan komunikasi tamu.',
+    className: 'bg-[#0ea5e9] text-white',
+    icon: <ClipboardCheck size={10} />,
+    can: ['Mengelola tamu, undangan, RSVP, dan komunikasi'],
+    cannot: ['Mengelola check-in dan seating'],
+  },
+  registration_officer: {
+    label: 'Registration Officer',
+    description: 'Menangani registrasi dan proses check-in.',
+    className: 'bg-[#10b981] text-white',
+    icon: <ScanLine size={10} />,
+    can: ['Melihat dan mengelola tamu', 'Memproses check-in dan walk-in'],
+    cannot: ['Mengelola undangan dan RSVP'],
+  },
+  usher: {
+    label: 'Usher',
+    description: 'Membantu kedatangan tamu dan penempatan tempat duduk.',
+    className: 'bg-[#14b8a6] text-white',
+    icon: <UserCog size={10} />,
+    can: ['Melihat status kedatangan tamu', 'Memproses check-in dan melihat seating'],
+    cannot: ['Mengubah data tamu dan undangan'],
+  },
+  gift_officer: {
+    label: 'Gift Officer',
+    description: 'Menangani penerimaan hadiah dan souvenir.',
+    className: 'bg-[#f59e0b] text-white',
+    icon: <Gift size={10} />,
+    can: ['Melihat data tamu untuk kebutuhan hadiah'],
+    cannot: ['Mengelola check-in, RSVP, dan undangan'],
+  },
+  viewer: {
+    label: 'Viewer',
+    description: 'Akses baca untuk pemantauan dan laporan.',
+    className: 'bg-[#64748b] text-white',
+    icon: <Eye size={10} />,
+    can: ['Melihat data dan laporan yang tersedia'],
+    cannot: ['Mengubah data atau mengelola anggota'],
+  },
 };
 
 const statusConfig: Record<MemberStatus, { label: string; className: string }> = {
   active: { label: 'Aktif', className: 'bg-[#d1fae5] text-[#059669] border-[#a7f3d0]' },
   pending: { label: 'Menunggu', className: 'bg-[#fef3c7] text-[#d97706] border-[#fde68a]' },
   inactive: { label: 'Nonaktif', className: 'bg-[#f1f5f9] text-[#64748b] border-[#e2e8f0]' },
-};
-
-const rolePermissions: Record<TeamRole, { can: string[]; cannot: string[] }> = {
-  owner: {
-    can: ['Akses penuh ke semua fitur', 'Mengelola tim dan billing', 'Mengubah pengaturan tenant'],
-    cannot: [],
-  },
-  admin: {
-    can: ['Mengelola acara, tamu, RSVP & check-in', 'Mengelola komunikasi dan tempat duduk', 'Melihat laporan'],
-    cannot: ['Mengelola tim', 'Pengaturan tenant'],
-  },
-  editor: {
-    can: ['Mengelola tamu, RSVP & check-in', 'Mengelola komunikasi dan tempat duduk'],
-    cannot: ['Mengelola acara (hanya lihat)', 'Melihat laporan', 'Mengelola tim', 'Pengaturan tenant'],
-  },
-  viewer: {
-    can: ['Melihat semua data (read-only)'],
-    cannot: ['Mengedit data', 'Mengelola tim', 'Pengaturan tenant'],
-  },
 };
 
 function getInitials(name?: string | null) {
@@ -92,19 +135,20 @@ function getInitials(name?: string | null) {
 export default function Tim() {
   const { members, isLoading, error, refetch, inviteMember, updateRole, removeMember } = useTeam();
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isRoleManagerOpen, setIsRoleManagerOpen] = useState(false);
   const [isEditRoleOpen, setIsEditRoleOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<import('@/types').TeamMember | null>(null);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [inviteSent, setInviteSent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<TeamRole>('editor');
-  const [inviteMessage, setInviteMessage] = useState('');
+  const [inviteRole, setInviteRole] = useState<TenantRole>('rsvp_officer');
 
   const stats = {
     total: members.length,
-    admin: members.filter((m) => m.role === 'admin' || m.role === 'owner').length,
-    editor: members.filter((m) => m.role === 'editor').length,
+    management: members.filter((m) => m.role === 'tenant_owner' || m.role === 'event_manager').length,
+    rsvp: members.filter((m) => m.role === 'rsvp_officer').length,
+    operational: members.filter((m) => m.role === 'registration_officer' || m.role === 'usher' || m.role === 'gift_officer').length,
     viewer: members.filter((m) => m.role === 'viewer').length,
     pending: members.filter((m) => m.status === 'pending').length,
   };
@@ -116,7 +160,7 @@ export default function Tim() {
     }
     setIsSubmitting(true);
     try {
-      const success = await inviteMember({ email: inviteEmail, role: inviteRole, message: inviteMessage || undefined });
+      const success = await inviteMember({ email: inviteEmail, role: inviteRole });
       if (success) {
         setInviteSent(true);
         toast.success('Undangan terkirim');
@@ -124,37 +168,42 @@ export default function Tim() {
           setIsInviteOpen(false);
           setInviteSent(false);
           setInviteEmail('');
-          setInviteRole('editor');
-          setInviteMessage('');
+          setInviteRole('rsvp_officer');
         }, 2000);
       } else {
         toast.error('Gagal mengirim undangan');
       }
-    } catch {
-      toast.error('Gagal mengirim undangan');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Gagal mengirim undangan');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (member: TeamMember) => {
+    if (member.role === 'tenant_owner') {
+      toast.error('Peran Tenant Owner tidak dapat dihapus');
+      return;
+    }
+    if (!window.confirm(`Nonaktifkan akses ${member.user?.fullName || member.user?.email || 'anggota ini'}?`)) {
+      return;
+    }
+
     try {
-      const success = await removeMember(id);
+      const success = await removeMember(member.id);
       if (success) {
-        toast.success('Anggota berhasil dihapus');
+        toast.success('Akses anggota berhasil dinonaktifkan');
       }
-    } catch {
-      toast.error('Gagal menghapus anggota');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Gagal menonaktifkan anggota');
     }
   };
 
-  const handleDeactivate = async (_id: string) => {
-    // Deactivate via updateRole with 'inactive' isn't directly supported,
-    // so we show a toast. The backend handles status separately.
-    toast.info('Fitur nonaktif akan segera tersedia');
-  };
-
-  const openEditRole = (member: import('@/types').TeamMember) => {
+  const openEditRole = (member: TeamMember) => {
+    if (member.role === 'tenant_owner') {
+      toast.info('Peran Tenant Owner tidak dapat diubah');
+      return;
+    }
     setEditingMember(member);
     setIsEditRoleOpen(true);
   };
@@ -163,6 +212,10 @@ export default function Tim() {
     if (!editingMember) return;
     setIsSubmitting(true);
     try {
+      if (editingMember.role === 'tenant_owner') {
+        toast.error('Peran Tenant Owner tidak dapat dipilih');
+        return;
+      }
       const success = await updateRole(editingMember.id, editingMember.role);
       if (success) {
         toast.success('Peran berhasil diperbarui');
@@ -170,8 +223,8 @@ export default function Tim() {
       } else {
         toast.error('Gagal memperbarui peran');
       }
-    } catch {
-      toast.error('Gagal memperbarui peran');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Gagal memperbarui peran');
     } finally {
       setIsSubmitting(false);
     }
@@ -203,6 +256,7 @@ export default function Tim() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => setIsRoleManagerOpen(true)}
             className="h-10 gap-2 border-[#e2e8f0] text-[#64748b] hover:text-[#1e293b]"
           >
             <Settings size={16} />
@@ -222,8 +276,9 @@ export default function Tim() {
       <div className="flex flex-wrap gap-3">
         {[
           { label: 'Total Anggota', value: stats.total, icon: <Users size={16} />, color: 'text-[#64748b]', bg: 'bg-[#f8fafc] dark:bg-[#1e293b]' },
-          { label: 'Admin', value: stats.admin, icon: <Shield size={16} />, color: 'text-[#6366f1]', bg: 'bg-[#eef2ff]' },
-          { label: 'Editor', value: stats.editor, icon: <Pencil size={16} />, color: 'text-[#10b981]', bg: 'bg-[#d1fae5]' },
+          { label: 'Manajemen', value: stats.management, icon: <Shield size={16} />, color: 'text-[#6366f1]', bg: 'bg-[#eef2ff]' },
+          { label: 'RSVP', value: stats.rsvp, icon: <ClipboardCheck size={16} />, color: 'text-[#0284c7]', bg: 'bg-[#e0f2fe]' },
+          { label: 'Operasional', value: stats.operational, icon: <ScanLine size={16} />, color: 'text-[#10b981]', bg: 'bg-[#d1fae5]' },
           { label: 'Viewer', value: stats.viewer, icon: <Eye size={16} />, color: 'text-[#f59e0b]', bg: 'bg-[#fef3c7]' },
           { label: 'Menunggu', value: stats.pending, icon: <Clock size={16} />, color: 'text-[#94a3b8]', bg: 'bg-[#f1f5f9]' },
         ].map((stat, i) => (
@@ -284,7 +339,7 @@ export default function Tim() {
               <tbody>
                 <AnimatePresence>
                   {members.map((member, index) => {
-                    const role = roleConfig[member.role as TeamRole] || roleConfig.viewer;
+                    const role = roleConfig[member.role] || roleConfig.viewer;
                     const status = statusConfig[member.status as MemberStatus] || statusConfig.active;
                     return (
                       <motion.tr
@@ -341,30 +396,15 @@ export default function Tim() {
                             >
                               <Shield size={14} />
                             </button>
-                            {member.status === 'pending' && (
+                            {member.role !== 'tenant_owner' && (
                               <button
-                                className="p-1.5 rounded-md text-[#64748b] hover:text-[#4f46e5] hover:bg-[#eef2ff] transition-colors"
-                                title="Kirim Ulang"
-                              >
-                                <Mail size={14} />
-                              </button>
-                            )}
-                            {member.status === 'active' && (
-                              <button
-                                onClick={() => handleDeactivate(member.id)}
-                                className="p-1.5 rounded-md text-[#64748b] hover:text-[#f59e0b] hover:bg-[#fef3c7] transition-colors"
+                                onClick={() => handleDelete(member)}
+                                className="p-1.5 rounded-md text-[#64748b] hover:text-[#f43f5e] hover:bg-[#ffe4e6] transition-colors"
                                 title="Nonaktifkan"
                               >
-                                <UserX size={14} />
+                                <Trash2 size={14} />
                               </button>
                             )}
-                            <button
-                              onClick={() => handleDelete(member.id)}
-                              className="p-1.5 rounded-md text-[#64748b] hover:text-[#f43f5e] hover:bg-[#ffe4e6] transition-colors"
-                              title="Hapus"
-                            >
-                              <Trash2 size={14} />
-                            </button>
                           </div>
                         </td>
                       </motion.tr>
@@ -376,6 +416,53 @@ export default function Tim() {
           </div>
         </motion.div>
       )}
+
+      {/* Role Catalog Modal */}
+      <Dialog open={isRoleManagerOpen} onOpenChange={setIsRoleManagerOpen}>
+        <DialogContent className="max-w-[680px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-[1.25rem] font-semibold text-[#1e293b] dark:text-[#f8fafc]">
+              Kelola Peran
+            </DialogTitle>
+            <DialogDescription className="text-[#64748b]">
+              Peran tenant menentukan akses dasar anggota. Penugasan role khusus acara dilakukan di menu Tim Acara.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {allRoles.map((role) => {
+              const config = roleConfig[role];
+              return (
+                <div key={role} className="rounded-xl border border-[#e2e8f0] dark:border-[#334155] p-4">
+                  <div className="flex items-start gap-3">
+                    <span className={cn('mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-lg', config.className)}>
+                      {config.icon}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[#1e293b] dark:text-[#f8fafc]">{config.label}</p>
+                      <p className="mt-1 text-xs text-[#64748b]">{config.description}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-1.5">
+                    {config.can.map((permission) => (
+                      <div key={permission} className="flex items-start gap-2 text-xs text-[#475569] dark:text-[#cbd5e1]">
+                        <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-[#10b981]" />
+                        <span>{permission}</span>
+                      </div>
+                    ))}
+                    {config.cannot.map((permission) => (
+                      <div key={permission} className="flex items-start gap-2 text-xs text-[#94a3b8]">
+                        <X size={13} className="mt-0.5 shrink-0" />
+                        <span>{permission}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Invite Modal */}
       <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
@@ -432,15 +519,15 @@ export default function Tim() {
                   <Label>Peran</Label>
                   <Select
                     value={inviteRole}
-                    onValueChange={(v) => setInviteRole(v as TeamRole)}
+                    onValueChange={(v) => setInviteRole(v as TenantRole)}
                   >
                     <SelectTrigger className="mt-1.5 h-10">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="editor">Editor</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
+                      {roleOptions.map((role) => (
+                        <SelectItem key={role} value={role}>{roleConfig[role].label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -449,13 +536,13 @@ export default function Tim() {
                 <div className="p-3 bg-[#f8fafc] dark:bg-[#1e293b] rounded-lg space-y-2">
                   <p className="text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider">Ringkasan Izin</p>
                   <div className="space-y-1">
-                    {rolePermissions[inviteRole].can.map((p) => (
+                    {roleConfig[inviteRole].can.map((p) => (
                       <div key={p} className="flex items-start gap-2 text-[12px]">
                         <CheckCircle2 size={12} className="text-[#10b981] mt-0.5 flex-shrink-0" />
                         <span className="text-[#1e293b] dark:text-[#f8fafc]">{p}</span>
                       </div>
                     ))}
-                    {rolePermissions[inviteRole].cannot.map((p) => (
+                    {roleConfig[inviteRole].cannot.map((p) => (
                       <div key={p} className="flex items-start gap-2 text-[12px]">
                         <X size={12} className="text-[#94a3b8] mt-0.5 flex-shrink-0" />
                         <span className="text-[#94a3b8]">{p}</span>
@@ -464,16 +551,6 @@ export default function Tim() {
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="invite-msg">Pesan (opsional)</Label>
-                  <Textarea
-                    id="invite-msg"
-                    value={inviteMessage}
-                    onChange={(e) => setInviteMessage(e.target.value)}
-                    placeholder="Tambahkan pesan personal..."
-                    className="mt-1.5 min-h-[80px]"
-                  />
-                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -504,29 +581,34 @@ export default function Tim() {
               Ubah Peran — {editingMember?.user?.fullName || 'Anggota'}
             </DialogTitle>
             <DialogDescription className="text-[#64748b]">
-              Peran saat ini: <span className="font-medium">{editingMember && roleConfig[editingMember.role as TeamRole]?.label}</span>
+              Peran saat ini: <span className="font-medium">{editingMember && roleConfig[editingMember.role]?.label}</span>
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-2">
             <div>
               <Label>Peran Baru</Label>
-              <Select
-                value={editingMember?.role || 'editor'}
-                onValueChange={(v) =>
-                  setEditingMember((prev) => prev ? { ...prev, role: v as TeamRole } : null)
-                }
-              >
-                <SelectTrigger className="mt-1.5 h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="owner">Owner</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="editor">Editor</SelectItem>
-                  <SelectItem value="viewer">Viewer</SelectItem>
-                </SelectContent>
-              </Select>
+              {editingMember?.role === 'tenant_owner' ? (
+                <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3 text-sm text-[#64748b]">
+                  Peran Tenant Owner bersifat permanen dan tidak dapat diubah dari halaman ini.
+                </div>
+              ) : (
+                <Select
+                  value={editingMember?.role || 'viewer'}
+                  onValueChange={(v) =>
+                    setEditingMember((prev) => prev ? { ...prev, role: v as TenantRole } : null)
+                  }
+                >
+                  <SelectTrigger className="mt-1.5 h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roleOptions.map((role) => (
+                      <SelectItem key={role} value={role}>{roleConfig[role].label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {editingMember && (
