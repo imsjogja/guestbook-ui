@@ -9,6 +9,7 @@ export { useRSVP } from './useRSVP';
 export { useCheckin } from './useCheckin';
 export { useSeating } from './useSeating';
 export { useTemplates } from './useTemplates';
+export { useRSVPReminders } from './useRSVPReminders';
 export { useCampaigns } from './useCampaigns';
 export { useMessages } from './useMessages';
 export { useWhatsAppMessaging } from './useWhatsAppMessaging';

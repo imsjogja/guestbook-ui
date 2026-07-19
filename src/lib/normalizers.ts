@@ -270,6 +270,7 @@ export function normalizeTemplate(raw: BackendTemplate): Template {
     subject: raw.subject ?? undefined,
     body: raw.body,
     channel: normalizeTemplateChannel(raw.channel),
+    type: raw.type,
     category: normalizeTemplateCategory(raw.type),
     variables: raw.variables ?? [],
     isActive: raw.is_active ?? true,

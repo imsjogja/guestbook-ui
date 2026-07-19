@@ -162,7 +162,7 @@ export function useRSVP(eventId?: string) {
       }
 
       try {
-        const response = await api.put<{ data: RSVP }>(`/rsvp/${id}`, toBackendRSVPUpdate(data));
+        const response = await api.patch<{ data: RSVP }>(`/rsvp/${id}`, toBackendRSVPUpdate(data));
         const updated = normalizeRSVP(response.data.data as unknown as ApiRSVP);
         setRsvps((prev) => prev.map((r) => (r.id === id ? updated : r)));
         return updated;

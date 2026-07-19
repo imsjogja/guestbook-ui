@@ -208,6 +208,7 @@ export interface Template {
   subject?: string;
   body: string;
   channel: 'whatsapp' | 'email' | 'both';
+  type?: string;
   category: 'invitation' | 'reminder' | 'thank_you' | 'rsvp_confirmation' | 'custom';
   variables: string[];
   isActive: boolean;

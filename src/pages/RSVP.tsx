@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
@@ -36,7 +36,7 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { useRSVP } from '@/hooks';
+import { useRSVP, useRSVPReminders, useTemplates } from '@/hooks';
 import { useTenantStore } from '@/store/tenantStore';
 import type { RSVPStatus } from '@/types';
 import { buildRSVPExportCsv, downloadTextFile } from '@/lib/rsvp-csv';
@@ -91,14 +91,48 @@ const CHART_COLORS = {
 export default function RSVPPage() {
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
   const { rsvps, breakdown, isLoading, error, refetch, updateRSVP } = useRSVP(currentEventId);
+  const { templates, isLoading: templatesLoading } = useTemplates();
+  const {
+    candidates,
+    isLoading: candidatesLoading,
+    error: candidatesError,
+    fetchCandidates,
+    sendReminders,
+  } = useRSVPReminders(currentEventId);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [reminderModalOpen, setReminderModalOpen] = useState(false);
-  const [reminderChannel, setReminderChannel] = useState('whatsapp');
+  const [reminderChannel, setReminderChannel] = useState<'whatsapp' | 'email'>('whatsapp');
+  const [reminderTemplateId, setReminderTemplateId] = useState('');
+  const [reminderGuestIds, setReminderGuestIds] = useState<string[] | null>(null);
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  const reminderTemplates = useMemo(
+    () => templates.filter(
+      (template) => template.isActive && template.type === 'rsvp_followup' &&
+        (template.channel === 'whatsapp' || template.channel === 'email')
+    ),
+    [templates]
+  );
+  const channelTemplates = useMemo(
+    () => reminderTemplates.filter((template) => template.channel === reminderChannel),
+    [reminderChannel, reminderTemplates]
+  );
+  const reminderCandidates = useMemo(
+    () => reminderGuestIds?.length
+      ? candidates.filter((candidate) => reminderGuestIds.includes(candidate.guestId))
+      : candidates,
+    [candidates, reminderGuestIds]
+  );
+
+  useEffect(() => {
+    if (!channelTemplates.some((template) => template.id === reminderTemplateId)) {
+      setReminderTemplateId(channelTemplates[0]?.id ?? '');
+    }
+  }, [channelTemplates, reminderTemplateId]);
 
   /* ── Filtering ──────────────────────────────────── */
 
@@ -149,10 +183,36 @@ export default function RSVPPage() {
     setEditingId(null);
   };
 
+  const openReminderModal = async (guestId?: string) => {
+    setReminderGuestIds(guestId ? [guestId] : null);
+    setReminderModalOpen(true);
+    try {
+      await fetchCandidates();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Gagal memuat kandidat pengingat RSVP');
+    }
+  };
+
   const sendReminder = async () => {
+    if (!reminderTemplateId) {
+      toast.error(`Template pengingat ${reminderChannel === 'whatsapp' ? 'WhatsApp' : 'email'} belum tersedia`);
+      return;
+    }
+
     setSendingReminder(true);
     try {
-      toast.info('Pengiriman pengingat RSVP belum terhubung ke backend');
+      const result = await sendReminders(reminderTemplateId, reminderGuestIds ?? undefined);
+      const sentCount = result.messages.filter((message) => ['sent', 'delivered', 'read'].includes(message.status)).length;
+      const failedCount = result.messages.filter((message) => message.status === 'failed').length;
+      const skippedCount = result.skipped.length;
+      const summary = `${sentCount} terkirim${failedCount ? `, ${failedCount} gagal` : ''}${skippedCount ? `, ${skippedCount} dilewati` : ''}`;
+      toast.success(`Pengingat RSVP diproses: ${summary}`);
+      if (result.deadlinePassed) {
+        toast.warning('Batas waktu RSVP acara sudah lewat');
+      }
+      await refetch();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Gagal mengirim pengingat RSVP');
     } finally {
       setSendingReminder(false);
       setReminderModalOpen(false);
@@ -235,7 +295,7 @@ export default function RSVPPage() {
             <Pencil size={16} />
             <span className="hidden sm:inline">Perbarui Manual</span>
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => setReminderModalOpen(true)}>
+          <Button variant="secondary" size="sm" onClick={() => openReminderModal()}>
             <Bell size={16} />
             <span className="hidden sm:inline">Kirim Pengingat</span>
           </Button>
@@ -559,7 +619,7 @@ export default function RSVPPage() {
                           </button>
                           {r.status === 'no_response' && (
                             <button
-                              onClick={() => setReminderModalOpen(true)}
+                              onClick={() => openReminderModal(r.guestId)}
                               className="p-1.5 rounded-md text-[#64748b] hover:bg-[#fef3c7] hover:text-[#f59e0b] transition-colors"
                               title="Kirim Pengingat"
                             >
@@ -588,7 +648,7 @@ export default function RSVPPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">Kirim Pengingat RSVP</DialogTitle>
             <DialogDescription className="text-sm text-[#64748b]">
-              {stats.noResponse} tamu belum membalas undangan RSVP
+              {candidatesLoading ? 'Memeriksa kandidat pengingat...' : `${reminderCandidates.length} tamu eligible untuk pengingat`}
             </DialogDescription>
           </DialogHeader>
 
@@ -599,9 +659,8 @@ export default function RSVPPage() {
               </label>
               <div className="flex gap-3">
                 {[
-                  { value: 'whatsapp', label: 'WhatsApp', icon: <MessageCircle size={16} /> },
-                  { value: 'email', label: 'Email', icon: <Mail size={16} /> },
-                  { value: 'both', label: 'Keduanya', icon: <Send size={16} /> },
+                  { value: 'whatsapp' as const, label: 'WhatsApp', icon: <MessageCircle size={16} /> },
+                  { value: 'email' as const, label: 'Email', icon: <Mail size={16} /> },
                 ].map((ch) => (
                   <button
                     key={ch.value}
@@ -624,31 +683,42 @@ export default function RSVPPage() {
               <label className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc] mb-2 block">
                 Template Pesan
               </label>
-              <Select defaultValue="default">
+              <Select
+                value={reminderTemplateId}
+                onValueChange={setReminderTemplateId}
+                disabled={templatesLoading || channelTemplates.length === 0}
+              >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue placeholder={templatesLoading ? 'Memuat template...' : 'Pilih template pengingat'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="default">Template Pengingat Default</SelectItem>
-                  <SelectItem value="friendly">Template Santai</SelectItem>
-                  <SelectItem value="formal">Template Formal</SelectItem>
+                  {channelTemplates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {!templatesLoading && channelTemplates.length === 0 && (
+                <p className="text-xs text-[#b45309] mt-2">Belum ada template RSVP follow-up aktif untuk channel ini.</p>
+              )}
             </div>
 
             <div className="bg-[#fefce8] dark:bg-[#422006]/30 border border-[#f59e0b]/20 rounded-lg p-3">
               <p className="text-xs text-[#92400e] dark:text-[#fbbf24]">
-                Pengingat akan dikirim ke {stats.noResponse}{' '}
-                tamu yang belum membalas RSVP. Pastikan saldo WhatsApp/Email mencukupi.
+                Pengingat akan dikirim ke {reminderCandidates.length} tamu yang memiliki undangan aktif dan belum membalas RSVP.
+                Pastikan kontak dan konfigurasi {reminderChannel === 'whatsapp' ? 'WhatsApp' : 'email'} tersedia.
               </p>
             </div>
+            {candidatesError && <p className="text-xs text-[#b91c1c]">{candidatesError}</p>}
           </div>
 
           <DialogFooter>
             <Button variant="secondary" onClick={() => setReminderModalOpen(false)}>
               Batal
             </Button>
-            <Button onClick={sendReminder} disabled={sendingReminder}>
+            <Button
+              onClick={sendReminder}
+              disabled={sendingReminder || candidatesLoading || templatesLoading || !reminderTemplateId || reminderCandidates.length === 0}
+            >
               {sendingReminder ? (
                 <>
                   <Loader2 size={14} className="animate-spin mr-2" />
