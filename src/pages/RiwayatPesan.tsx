@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   RefreshCw,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMessages } from '@/hooks';
+import { useTenantStore } from '@/store/tenantStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -49,12 +50,22 @@ const statusConfig: Record<MessageStatus, { label: string; color: string; bgColo
 };
 
 export default function RiwayatPesan() {
-  const { messages, isLoading, error, refetch } = useMessages();
+  const currentEvent = useTenantStore((state) => state.currentEvent);
+  const currentEventId = currentEvent?.id;
+  const { messages, isLoading, error, refetch } = useMessages(currentEventId);
   const [searchQuery, setSearchQuery] = useState('');
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedMessage, setSelectedMessage] = useState<import('@/types').Message | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  useEffect(() => {
+    setSearchQuery('');
+    setChannelFilter('all');
+    setStatusFilter('all');
+    setSelectedMessage(null);
+    setIsDetailOpen(false);
+  }, [currentEventId]);
 
   const totalStats = {
     total: messages.length,
@@ -100,7 +111,9 @@ export default function RiwayatPesan() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-[2.25rem] font-bold text-[#0f172a] dark:text-[#f8fafc]">Riwayat Pesan</h1>
-          <p className="text-sm text-[#64748b] mt-1">Lacak status pengiriman pesan</p>
+          <p className="text-sm text-[#64748b] mt-1">
+            Lacak status pengiriman pesan{currentEvent ? ` untuk ${currentEvent.name}` : ''}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <Button

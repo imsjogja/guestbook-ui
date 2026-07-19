@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
 import type { Message } from '@/types';
 
@@ -62,27 +62,47 @@ export function useMessages(eventId?: string): UseMessagesReturn {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   const fetchMessages = useCallback(async () => {
+    if (!eventId) {
+      setMessages([]);
+      setTotal(0);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    const requestId = ++requestIdRef.current;
     setIsLoading(true);
     setError(null);
     try {
-      const params = eventId ? { eventId } : {};
+      const params = { eventId };
       const res = await api.get<{ data: BackendMessage[]; meta?: { total?: number } }>('/messages', { params });
+      if (requestId !== requestIdRef.current) return;
       const normalized = (res.data.data || []).map(normalizeMessage);
       setMessages(normalized);
       setTotal(res.data.meta?.total || normalized.length);
     } catch (err: unknown) {
+      if (requestId !== requestIdRef.current) return;
       const msg = err instanceof Error ? err.message : 'Gagal memuat pesan';
       setError(msg);
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) setIsLoading(false);
     }
   }, [eventId]);
 
   useEffect(() => {
-    fetchMessages();
-  }, [fetchMessages]);
+    setMessages([]);
+    setTotal(0);
+    setError(null);
+    if (!eventId) {
+      requestIdRef.current += 1;
+      setIsLoading(false);
+      return;
+    }
+    void fetchMessages();
+  }, [eventId, fetchMessages]);
 
   return { messages, total, isLoading, error, refetch: fetchMessages };
 }
