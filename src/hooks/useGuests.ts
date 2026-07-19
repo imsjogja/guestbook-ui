@@ -69,6 +69,10 @@ type PaginatedBackendEventGuestResponse = {
   meta?: PaginatedBackendGuestResponse['meta'];
 };
 
+type GuestSearchResponse = {
+  data: BackendGuest[];
+};
+
 function normalizeEventGuest(item: BackendEventGuestResponse): Guest {
   return {
     ...normalizeGuest(item.guest),
@@ -112,6 +116,45 @@ function buildGuestPayload(data: Partial<Guest>): GuestPayload {
   return payload;
 }
 
+function normalizePhone(value?: string | null): string {
+  const digits = (value ?? '').replace(/\D/g, '');
+  if (digits.startsWith('0')) return `62${digits.slice(1)}`;
+  return digits;
+}
+
+function samePhone(left?: string | null, right?: string | null): boolean {
+  const normalizedLeft = normalizePhone(left);
+  const normalizedRight = normalizePhone(right);
+  return normalizedLeft !== '' && normalizedLeft === normalizedRight;
+}
+
+function matchesGuest(guest: BackendGuest, data: Partial<Guest>): boolean {
+  const phoneMatches = Boolean(data.phone?.trim() && samePhone(guest.phone, data.phone));
+  const emailMatches = Boolean(
+    data.email?.trim() && guest.email?.trim().toLowerCase() === data.email.trim().toLowerCase()
+  );
+  return phoneMatches || emailMatches;
+}
+
+async function searchExistingMasterGuest(data: Partial<Guest>): Promise<BackendGuest | null> {
+  const matches = new Map<string, BackendGuest>();
+  const phone = data.phone?.trim();
+  const normalizedPhone = normalizePhone(phone);
+  const localPhone = normalizedPhone.startsWith('62') ? `0${normalizedPhone.slice(2)}` : undefined;
+  const searchValues = [phone, normalizedPhone, localPhone, data.email?.trim()]
+    .filter((value): value is string => Boolean(value))
+    .filter((value, index, values) => values.indexOf(value) === index);
+
+  for (const value of searchValues) {
+    const response = await api.get<GuestSearchResponse>('/guests/search', { params: { q: value } });
+    for (const guest of response.data.data ?? []) {
+      if (matchesGuest(guest, data)) matches.set(guest.id, guest);
+    }
+  }
+
+  return matches.values().next().value ?? null;
+}
+
 export function useGuests(eventId?: string) {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [total, setTotal] = useState(0);
@@ -150,8 +193,14 @@ export function useGuests(eventId?: string) {
   const createGuest = useCallback(
     async (data: Partial<Guest>) => {
       try {
-        const response = await api.post<{ data: BackendGuest }>('/guests', buildGuestPayload(data));
-        const masterGuest = normalizeGuest(response.data.data);
+        const existingMasterGuest = eventId ? await searchExistingMasterGuest(data) : null;
+        let masterGuest: Guest;
+        if (existingMasterGuest) {
+          masterGuest = normalizeGuest(existingMasterGuest);
+        } else {
+          const response = await api.post<{ data: BackendGuest }>('/guests', buildGuestPayload(data));
+          masterGuest = normalizeGuest(response.data.data);
+        }
         const newGuest = eventId
           ? normalizeEventGuest((await api.post<{ data: BackendEventGuestResponse }>('/event-guests', {
               guest_id: masterGuest.id,
@@ -174,7 +223,7 @@ export function useGuests(eventId?: string) {
   const updateGuest = useCallback(
     async (id: string, data: Partial<Guest>) => {
       try {
-        const response = await api.put<{ data: BackendGuest }>(`/guests/${id}`, buildGuestPayload(data));
+        const response = await api.patch<{ data: BackendGuest }>(`/guests/${id}`, buildGuestPayload(data));
         const updated = normalizeGuest(response.data.data);
         const existing = guests.find((guest) => guest.id === id);
         const result = existing
