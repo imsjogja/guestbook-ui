@@ -73,6 +73,18 @@ type GuestSearchResponse = {
   data: BackendGuest[];
 };
 
+export interface GuestImportResult {
+  total_rows: number;
+  success_count: number;
+  error_count: number;
+  errors?: Array<{
+    row_num: number;
+    full_name?: string;
+    errors?: string[];
+  }>;
+  imported_guest_ids?: string[];
+}
+
 function normalizeEventGuest(item: BackendEventGuestResponse): Guest {
   return {
     ...normalizeGuest(item.guest),
@@ -259,14 +271,14 @@ export function useGuests(eventId?: string) {
         const formData = new FormData();
         formData.append('file', file);
         if (eventId) formData.append('eventId', eventId);
-        const response = await api.post<{ data: { imported: number } }>(eventId ? '/event-guests/import' : '/guests/import', formData, {
+        const response = await api.post<{ data: GuestImportResult }>(eventId ? '/event-guests/import' : '/guests/import', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         await fetchGuests();
         return response.data.data;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal mengimpor CSV');
+        const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+        throw new Error(axiosErr.response?.data?.error ?? axiosErr.response?.data?.message ?? 'Gagal mengimpor CSV');
       }
     },
     [eventId, fetchGuests]

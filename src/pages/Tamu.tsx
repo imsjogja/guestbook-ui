@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getGuestInitials } from '@/lib/normalizers';
-import { useGuests } from '@/hooks/useGuests';
+import { useGuests, type GuestImportResult } from '@/hooks/useGuests';
 import { useRSVP, useSeating, useTemplates, useWhatsAppMessaging } from '@/hooks';
 import { buildRsvpByGuestId, buildTableByGuestId, getGuestRsvpStatus, getGuestTableName } from '@/lib/guest-live-data';
 import type { Guest } from '@/types';
@@ -105,6 +105,8 @@ export default function Tamu() {
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [templateDownloading, setTemplateDownloading] = useState(false);
+  const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<GuestImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* Pagination */
@@ -330,11 +332,43 @@ export default function Tamu() {
   const handleFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setErrorToast(null);
+    setImportResult(null);
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setSelectedImportFile(null);
+      setErrorToast('File harus berformat CSV');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setSelectedImportFile(null);
+      setErrorToast('Ukuran file maksimal 5MB');
+      return;
+    }
+    setSelectedImportFile(file);
+  };
+
+  const handleImportSubmit = async () => {
+    if (!selectedImportFile) {
+      setErrorToast('Pilih file CSV terlebih dahulu');
+      return;
+    }
+
     setImporting(true);
     setErrorToast(null);
     try {
-      await importCSV(file);
-      setShowImport(false);
+      const result = await importCSV(selectedImportFile);
+      setImportResult(result);
+      const summary = `${result.success_count} berhasil, ${result.error_count} gagal dari ${result.total_rows} baris`;
+      if (result.error_count > 0) {
+        const firstError = result.errors?.[0];
+        const detail = firstError?.errors?.[0] ? ` Baris ${firstError.row_num}: ${firstError.errors[0]}.` : '';
+        setErrorToast(`Import selesai sebagian: ${summary}.${detail}`);
+        toast.warning(`Import selesai sebagian: ${summary}`);
+      } else {
+        toast.success(`Import berhasil: ${summary}`);
+        setShowImport(false);
+        setSelectedImportFile(null);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal mengimpor CSV';
       setErrorToast(msg);
@@ -453,7 +487,7 @@ export default function Tamu() {
             <Plus size={16} />
             Tambah Tamu
           </button>
-          <button onClick={() => setShowImport(true)}
+          <button onClick={() => { setSelectedImportFile(null); setImportResult(null); setErrorToast(null); setShowImport(true); }}
             disabled={isLoading}
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors disabled:opacity-50">
             <Upload size={15} />
@@ -837,6 +871,28 @@ export default function Tamu() {
                     </>
                   )}
                 </div>
+                {selectedImportFile && (
+                  <div className="mt-3 rounded-lg bg-[#eef2ff] border border-[#c7d2fe] px-3 py-2 text-sm text-[#3730a3]">
+                    File dipilih: <strong>{selectedImportFile.name}</strong>
+                  </div>
+                )}
+                {importResult && (
+                  <div className={cn(
+                    'mt-3 rounded-lg border px-3 py-2 text-xs',
+                    importResult.error_count > 0
+                      ? 'bg-[#fff7ed] border-[#fed7aa] text-[#9a3412]'
+                      : 'bg-[#ecfdf5] border-[#a7f3d0] text-[#065f46]'
+                  )}>
+                    <p className="font-semibold">
+                      {importResult.success_count} berhasil, {importResult.error_count} gagal dari {importResult.total_rows} baris
+                    </p>
+                    {importResult.errors?.slice(0, 3).map((item) => (
+                      <p key={`${item.row_num}-${item.full_name}`} className="mt-1">
+                        Baris {item.row_num}: {item.errors?.join(', ') || 'Data tidak valid'}
+                      </p>
+                    ))}
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={handleDownloadTemplate}
@@ -848,8 +904,13 @@ export default function Tamu() {
                 </button>
               </div>
               <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#e2e8f0] dark:border-[#334155]">
-                <button onClick={() => setShowImport(false)} disabled={importing}
+                <button onClick={() => { setShowImport(false); setSelectedImportFile(null); setImportResult(null); }} disabled={importing}
                   className="h-10 px-4 rounded-lg text-sm font-medium text-[#64748b] hover:bg-[#f1f5f9] transition-colors disabled:opacity-50">Batal</button>
+                <button onClick={handleImportSubmit} disabled={importing || !selectedImportFile}
+                  className="h-10 px-5 rounded-lg text-sm font-medium bg-[#4f46e5] text-white hover:bg-[#6366f1] transition-colors disabled:opacity-50 inline-flex items-center gap-2">
+                  {importing && <Loader2 size={15} className="animate-spin" />}
+                  {importing ? 'Mengimpor...' : 'Submit Import'}
+                </button>
               </div>
             </motion.div>
           </div>
