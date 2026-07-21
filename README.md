@@ -126,6 +126,23 @@ vercel --prod
 
 Atau connect repo ke [vercel.com](https://vercel.com) untuk auto-deploy.
 
+### GitHub Actions ke Server GuestFlow
+
+Workflow `.github/workflows/deploy-production.yml` berjalan pada push ke `main`.
+Workflow menjalankan test dan build UI, kemudian pull commit terbaru serta rebuild
+container di `/home/ubuntu/apps/guestflow/ui`.
+
+Tambahkan secrets berikut pada repository ini melalui
+`Settings > Secrets and variables > Actions`:
+
+- `DEPLOY_HOST`: `168.110.204.168`
+- `DEPLOY_PORT`: `22`
+- `DEPLOY_USER`: `ubuntu`
+- `DEPLOY_SSH_KEY`: isi private key SSH deployment
+- `DEPLOY_KNOWN_HOSTS`: output `ssh-keyscan -H 168.110.204.168`
+
+Gunakan secrets yang sama pada repository backend `imsjogja/guestbook`.
+
 ### Netlify
 
 ```bash
