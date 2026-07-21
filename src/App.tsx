@@ -23,6 +23,7 @@ import RiwayatPesan from './pages/RiwayatPesan';
 import Tim from './pages/Tim';
 import TimAcara from './pages/TimAcara';
 import Pengaturan from './pages/Pengaturan';
+import Plan from './pages/Plan';
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
         <Route path="komunikasi/template" element={<TemplateKomunikasi />} />
         <Route path="tim" element={<Tim />} />
         <Route path="pengaturan" element={<Pengaturan />} />
+        <Route path="plan" element={<Plan />} />
 
         <Route element={<EventRequired />}>
           <Route index element={<Dashboard />} />

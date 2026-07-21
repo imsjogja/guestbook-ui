@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Menu,
   X,
+  CreditCard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEventAccess } from '@/hooks/useEventAccess';
@@ -70,6 +71,7 @@ const navGroups: NavGroup[] = [
       { label: 'Tim', path: '/tim', icon: <Users2 size={20} />, permission: 'team:read' },
       { label: 'Tim Acara', path: '/tim-acara', icon: <ShieldCheck size={20} />, permission: 'event_team:read' },
       { label: 'Pengaturan', path: '/pengaturan', icon: <Settings size={20} />, permission: 'settings:read' },
+      { label: 'Paket & Tagihan', path: '/plan', icon: <CreditCard size={20} /> },
     ],
   },
 ];
@@ -103,7 +105,7 @@ export default function Sidebar() {
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
-    return location.pathname.startsWith(path);
+    return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
   const canSee = (item: NavItem) => {
@@ -205,14 +207,14 @@ export default function Sidebar() {
                         {active && !collapsed && (
                           <motion.div
                             layoutId="activeIndicator"
-                            className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-5 bg-[#4f46e5] rounded-r-full"
+                            className="absolute left-0 top-0 bottom-0 my-auto w-[2px] h-5 bg-[#4f46e5] rounded-r-full"
                             transition={{ duration: 0.2, ease: easeOutExpo }}
                           />
                         )}
                         {active && collapsed && (
                           <motion.div
                             layoutId="activeIndicatorCollapsed"
-                            className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-5 bg-[#4f46e5] rounded-r-full"
+                            className="absolute left-0 top-0 bottom-0 my-auto w-[2px] h-5 bg-[#4f46e5] rounded-r-full"
                             transition={{ duration: 0.2, ease: easeOutExpo }}
                           />
                         )}
@@ -289,7 +291,7 @@ export default function Sidebar() {
                             {active && (
                               <motion.div
                                 layoutId="activeIndicatorMobile"
-                                className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-5 bg-[#4f46e5] rounded-r-full"
+                                className="absolute left-0 top-0 bottom-0 my-auto w-[2px] h-5 bg-[#4f46e5] rounded-r-full"
                                 transition={{ duration: 0.2, ease: easeOutExpo }}
                               />
                             )}

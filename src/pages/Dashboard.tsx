@@ -232,10 +232,10 @@ export default function Dashboard() {
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
   const [attendanceTab, setAttendanceTab] = useState<'7' | '30' | '90'>('30');
 
-  const { guests: guestsData, isLoading: guestsLoading } = useGuests(currentEventId);
-  const { rsvps, breakdown, isLoading: rsvpLoading } = useRSVP(currentEventId);
-  const { checkins, stats, isLoading: checkinLoading } = useCheckin();
-  const { events: eventsData, isLoading: eventsLoading } = useEvents();
+  const { guests: guestsData, isLoading: guestsLoading, error: guestsError } = useGuests(currentEventId);
+  const { rsvps, breakdown, isLoading: rsvpLoading, error: rsvpError } = useRSVP(currentEventId);
+  const { checkins, stats, isLoading: checkinLoading, error: checkinError } = useCheckin();
+  const { events: eventsData, isLoading: eventsLoading, error: eventsError } = useEvents();
 
   const isLoading = guestsLoading || rsvpLoading || checkinLoading || eventsLoading;
 
@@ -358,13 +358,13 @@ export default function Dashboard() {
       </div>
 
       {/* Error state */}
-      {(guestsData.length === 0 && !isLoading) && (
+      {(guestsError || rsvpError || checkinError || eventsError) && !isLoading && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-4 px-4 py-3 rounded-lg bg-[#fff1f2] dark:bg-[rgba(244,63,94,0.1)] border border-[#f43f5e]/20 text-sm text-[#f43f5e]"
         >
-          Gagal memuat data. Silakan muat ulang halaman.
+          {guestsError || rsvpError || checkinError || eventsError || "Gagal memuat data. Silakan muat ulang halaman."}
         </motion.div>
       )}
 
