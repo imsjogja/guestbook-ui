@@ -151,13 +151,13 @@ export function usePlans() {
   }, []);
 
   // Group plans by name with both billing cycles
-  const groupedPlans = data?.plans.reduce((acc, plan) => {
+  const groupedPlans = (data?.plans || []).reduce((acc, plan) => {
     if (!acc[plan.name]) acc[plan.name] = {};
     acc[plan.name][plan.billing_cycle] = plan;
     return acc;
-  }, {} as Record<string, Record<string, Plan>>) ?? {};
+  }, {} as Record<string, Record<string, Plan>>);
 
-  return { data, plans: data?.plans ?? [], groupedPlans, isLoading, error };
+  return { data, plans: data?.plans || [], groupedPlans, isLoading, error };
 }
 
 // ─── checkout helper ──────────────────────────────────────────────────────────
