@@ -54,6 +54,39 @@ export interface PlansResponse {
   snap_url: string;
 }
 
+function unwrapApiData(payload: unknown): unknown {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload;
+  const record = payload as Record<string, unknown>;
+  return record.data !== undefined ? record.data : payload;
+}
+
+export function normalizePlansResponse(payload: unknown): PlansResponse {
+  const unwrapped = unwrapApiData(payload);
+  if (!unwrapped || typeof unwrapped !== 'object' || Array.isArray(unwrapped)) {
+    return { plans: [], client_key: '', snap_url: '' };
+  }
+
+  const record = unwrapped as Record<string, unknown>;
+  return {
+    plans: Array.isArray(record.plans) ? record.plans as Plan[] : [],
+    client_key: typeof record.client_key === 'string' ? record.client_key : '',
+    snap_url: typeof record.snap_url === 'string' ? record.snap_url : '',
+  };
+}
+
+export function normalizePaymentHistory(payload: unknown): PaymentHistoryItem[] {
+  const unwrapped = unwrapApiData(payload);
+  if (Array.isArray(unwrapped)) return unwrapped as PaymentHistoryItem[];
+
+  if (unwrapped && typeof unwrapped === 'object') {
+    const record = unwrapped as Record<string, unknown>;
+    if (Array.isArray(record.items)) return record.items as PaymentHistoryItem[];
+    if (Array.isArray(record.data)) return record.data as PaymentHistoryItem[];
+  }
+
+  return [];
+}
+
 // ─── useSubscription ──────────────────────────────────────────────────────────
 
 export function useSubscription() {
@@ -144,8 +177,8 @@ export function usePlans() {
 
   useEffect(() => {
     setIsLoading(true);
-    api.get<{ data: PlansResponse }>('/billing/plans')
-      .then((res) => setData(res.data.data ?? res.data as unknown as PlansResponse))
+    api.get<unknown>('/billing/plans')
+      .then((res) => setData(normalizePlansResponse(res.data)))
       .catch(() => setError('Gagal memuat paket harga'))
       .finally(() => setIsLoading(false));
   }, []);
@@ -191,8 +224,8 @@ export function usePaymentHistory() {
 
   useEffect(() => {
     setIsLoading(true);
-    api.get<{ data: PaymentHistoryItem[] }>('/billing/history')
-      .then((res) => setData(res.data.data ?? res.data as unknown as PaymentHistoryItem[]))
+    api.get<unknown>('/billing/history')
+      .then((res) => setData(normalizePaymentHistory(res.data)))
       .catch(() => setError('Gagal memuat riwayat pembayaran'))
       .finally(() => setIsLoading(false));
   }, []);

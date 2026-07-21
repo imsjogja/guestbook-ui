@@ -3,13 +3,19 @@ import { motion } from 'framer-motion';
 import { Check, Loader2, CreditCard, Receipt } from 'lucide-react';
 import { usePlans, useSubscription, initiateCheckout, usePaymentHistory } from '@/hooks/useSubscription';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
 
 // Midtrans Snap global types
 declare global {
   interface Window {
     snap: any;
   }
+}
+
+function formatPaymentDate(value: string) {
+  return new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
 }
 
 export default function Plan() {
@@ -282,6 +288,7 @@ export default function Plan() {
 
 function PaymentHistory() {
   const { data: history, isLoading } = usePaymentHistory();
+  const safeHistory = Array.isArray(history) ? history : [];
 
   if (isLoading) {
     return (
@@ -291,7 +298,7 @@ function PaymentHistory() {
     );
   }
 
-  if (!history || history.length === 0) return null;
+  if (safeHistory.length === 0) return null;
 
   return (
     <div className="mt-20">
@@ -318,10 +325,10 @@ function PaymentHistory() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {history.map((item) => (
+              {safeHistory.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
-                    {dayjs(item.created_at).format('DD MMM YYYY HH:mm')}
+                    {formatPaymentDate(item.created_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col">
