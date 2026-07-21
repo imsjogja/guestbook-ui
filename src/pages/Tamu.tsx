@@ -21,7 +21,7 @@ import {
 import { cn } from '@/lib/utils';
 import { getGuestInitials } from '@/lib/normalizers';
 import { useGuests, type GuestImportResult } from '@/hooks/useGuests';
-import { useRSVP, useSeating, useTemplates, useWhatsAppMessaging } from '@/hooks';
+import { useRSVP, useSeating, useTemplates, useTenantAccess, useWhatsAppMessaging } from '@/hooks';
 import { buildRsvpByGuestId, buildTableByGuestId, getGuestRsvpStatus, getGuestTableName } from '@/lib/guest-live-data';
 import type { Guest } from '@/types';
 import { toast } from 'sonner';
@@ -93,6 +93,9 @@ export default function Tamu() {
   const { rsvps, refreshSilently: refreshRsvpsSilently } = useRSVP(currentEventId);
   const { tables, refreshSilently: refreshTablesSilently } = useSeating();
   const { templates } = useTemplates();
+  const { access, isLoading: isLoadingAccess } = useTenantAccess();
+  const canWriteGuests = access?.permissions.includes('guest:write') ?? false;
+  const canDeleteGuests = access?.permissions.includes('guest:delete') ?? false;
   const { sendWhatsApp, isSending: isSendingWhatsApp } = useWhatsAppMessaging();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -230,6 +233,10 @@ export default function Tamu() {
   };
 
   const handleAdd = async () => {
+    if (!canWriteGuests) {
+      toast.error('Anda tidak memiliki akses untuk menambah tamu');
+      return;
+    }
     setSubmitting(true);
     setErrorToast(null);
     try {
@@ -252,6 +259,10 @@ export default function Tamu() {
 
   const handleEdit = async () => {
     if (!editingGuest) return;
+    if (!canWriteGuests) {
+      toast.error('Anda tidak memiliki akses untuk mengubah tamu');
+      return;
+    }
     setSubmitting(true);
     setErrorToast(null);
     try {
@@ -274,6 +285,10 @@ export default function Tamu() {
 
   const handleDelete = async () => {
     if (!deletingGuest) return;
+    if (!canDeleteGuests) {
+      toast.error('Anda tidak memiliki akses untuk menghapus tamu');
+      return;
+    }
     setSubmitting(true);
     setErrorToast(null);
     try {
@@ -289,6 +304,10 @@ export default function Tamu() {
   };
 
   const handleBulkDelete = async () => {
+    if (!canDeleteGuests) {
+      toast.error('Anda tidak memiliki akses untuk menghapus tamu');
+      return;
+    }
     setSubmitting(true);
     setErrorToast(null);
     try {
@@ -350,6 +369,10 @@ export default function Tamu() {
   const handleImportSubmit = async () => {
     if (!selectedImportFile) {
       setErrorToast('Pilih file CSV terlebih dahulu');
+      return;
+    }
+    if (!canWriteGuests) {
+      setErrorToast('Anda tidak memiliki akses untuk mengimpor tamu');
       return;
     }
 
@@ -481,18 +504,22 @@ export default function Tamu() {
           <p className="text-sm text-[#64748b] mt-0.5">{total.toLocaleString('id-ID')} tamu terdaftar</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {canWriteGuests && (
           <button onClick={openAdd}
-            disabled={isLoading}
+            disabled={isLoading || isLoadingAccess}
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[#4f46e5] text-white text-sm font-medium hover:bg-[#6366f1] hover:scale-[1.02] active:scale-[0.96] transition-all disabled:opacity-50">
             <Plus size={16} />
             Tambah Tamu
           </button>
+          )}
+          {canWriteGuests && (
           <button onClick={() => { setSelectedImportFile(null); setImportResult(null); setErrorToast(null); setShowImport(true); }}
-            disabled={isLoading}
+            disabled={isLoading || isLoadingAccess}
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors disabled:opacity-50">
             <Upload size={15} />
             Impor CSV
           </button>
+          )}
           <button
             onClick={handleExport}
             disabled={isLoading || exporting}
@@ -501,7 +528,7 @@ export default function Tamu() {
             {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
             {exporting ? 'Mengekspor...' : 'Ekspor'}
           </button>
-          {selectedIds.size > 0 && (
+          {selectedIds.size > 0 && canDeleteGuests && (
             <button onClick={handleBulkDelete} disabled={submitting}
               className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[#f43f5e] text-white text-sm font-medium hover:bg-[#e11d48] transition-colors disabled:opacity-50">
               <Trash2 size={15} />
@@ -650,10 +677,12 @@ export default function Tamu() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {canWriteGuests && (
                               <button onClick={() => openEdit(g)}
                                 className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors" title="Ubah">
                                 <Pencil size={15} />
                               </button>
+                              )}
                               <button onClick={() => navigate(`/tamu/${g.id}`)}
                                 className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors" title="Lihat Detail">
                                 <Eye size={15} />
@@ -672,15 +701,21 @@ export default function Tamu() {
                                         className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-lg shadow-lg z-20 py-1">
                                         <button onClick={() => { navigate(`/tamu/${g.id}`); }}
                                           className="w-full text-left px-3 py-2 text-sm text-[#64748b] hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors">Lihat Detail</button>
+                                        {canWriteGuests && (
                                         <button onClick={() => openEdit(g)}
                                           className="w-full text-left px-3 py-2 text-sm text-[#64748b] hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors">Ubah Tamu</button>
+                                        )}
                                         <button onClick={() => handleGuestWhatsApp(g)} disabled={isSendingWhatsApp}
                                           className="w-full text-left px-3 py-2 text-sm text-[#059669] hover:bg-[#ecfdf5] transition-colors disabled:opacity-50">
                                           Kirim WhatsApp
                                         </button>
+                                        {canDeleteGuests && (
+                                        <>
                                         <div className="border-t border-[#e2e8f0] dark:border-[#334155] my-1" />
                                         <button onClick={() => openDelete(g)}
                                           className="w-full text-left px-3 py-2 text-sm text-[#f43f5e] hover:bg-[#ffe4e6]/50 transition-colors">Hapus</button>
+                                        </>
+                                        )}
                                       </motion.div>
                                     </>
                                   )}

@@ -15,7 +15,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useTemplates } from '@/hooks';
+import { useTemplates, useTenantAccess } from '@/hooks';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -72,6 +72,8 @@ function highlightVariables(text: string) {
 
 export default function TemplateKomunikasi() {
   const { templates, isLoading, error, refetch, createTemplate, updateTemplate, deleteTemplate, generateDefaultTemplates } = useTemplates();
+  const { access } = useTenantAccess();
+  const canWriteTemplates = access?.permissions.includes('communication:write') ?? false;
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -118,6 +120,10 @@ export default function TemplateKomunikasi() {
   };
 
   const handleGenerateDefaults = async () => {
+    if (!canWriteTemplates) {
+      toast.error('Anda tidak memiliki akses untuk membuat template default');
+      return;
+    }
     setIsGeneratingDefaults(true);
     const generated = await generateDefaultTemplates();
     setIsGeneratingDefaults(false);
@@ -129,6 +135,10 @@ export default function TemplateKomunikasi() {
   };
 
   const handleSave = async () => {
+    if (!canWriteTemplates) {
+      toast.error('Anda tidak memiliki akses untuk mengelola template');
+      return;
+    }
     if (!formName.trim() || !formBody.trim()) {
       toast.error('Nama template dan isi pesan wajib diisi');
       return;
@@ -170,6 +180,10 @@ export default function TemplateKomunikasi() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!canWriteTemplates) {
+      toast.error('Anda tidak memiliki akses untuk menghapus template');
+      return;
+    }
     try {
       const success = await deleteTemplate(id);
       if (success) {
@@ -186,6 +200,10 @@ export default function TemplateKomunikasi() {
   };
 
   const handleDuplicate = async (t: import('@/types').Template) => {
+    if (!canWriteTemplates) {
+      toast.error('Anda tidak memiliki akses untuk menduplikasi template');
+      return;
+    }
     try {
       await createTemplate({
         name: `${t.name} (Salinan)`,
@@ -235,6 +253,7 @@ export default function TemplateKomunikasi() {
               <SelectItem value="email">Email</SelectItem>
             </SelectContent>
           </Select>
+          {canWriteTemplates && (
           <Button
             variant="outline"
             size="sm"
@@ -245,6 +264,8 @@ export default function TemplateKomunikasi() {
             {isGeneratingDefaults ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
             <span className="hidden sm:inline">{isGeneratingDefaults ? 'Menyiapkan...' : 'Buat Default'}</span>
           </Button>
+          )}
+          {canWriteTemplates && (
           <Button
             onClick={openCreate}
             className="h-10 gap-2 bg-[#4f46e5] hover:bg-[#6366f1] text-white"
@@ -252,6 +273,7 @@ export default function TemplateKomunikasi() {
             <Plus size={16} />
             Buat Template
           </Button>
+          )}
         </div>
       </div>
 
@@ -344,6 +366,7 @@ export default function TemplateKomunikasi() {
                       >
                         <Eye size={15} />
                       </button>
+                      {canWriteTemplates && (
                       <button
                         onClick={() => openEdit(template)}
                         className="p-1.5 rounded-md text-[#64748b] hover:text-[#4f46e5] hover:bg-[#eef2ff] transition-colors"
@@ -351,6 +374,8 @@ export default function TemplateKomunikasi() {
                       >
                         <Pencil size={15} />
                       </button>
+                      )}
+                      {canWriteTemplates && (
                       <button
                         onClick={() => handleDuplicate(template)}
                         className="p-1.5 rounded-md text-[#64748b] hover:text-[#4f46e5] hover:bg-[#eef2ff] transition-colors"
@@ -358,6 +383,8 @@ export default function TemplateKomunikasi() {
                       >
                         <Copy size={15} />
                       </button>
+                      )}
+                      {canWriteTemplates && (
                       <button
                         onClick={() => handleDelete(template.id)}
                         className="p-1.5 rounded-md text-[#64748b] hover:text-[#f43f5e] hover:bg-[#ffe4e6] transition-colors"
@@ -365,6 +392,7 @@ export default function TemplateKomunikasi() {
                       >
                         <Trash2 size={15} />
                       </button>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -383,10 +411,12 @@ export default function TemplateKomunikasi() {
               <p className="text-sm text-[#64748b] mb-4">
                 Buat template pesan pertama Anda untuk memudahkan pengiriman komunikasi.
               </p>
+              {canWriteTemplates && (
               <Button onClick={openCreate} className="bg-[#4f46e5] hover:bg-[#6366f1] text-white gap-2">
                 <Plus size={16} />
                 Buat Template
               </Button>
+              )}
             </div>
           )}
         </>

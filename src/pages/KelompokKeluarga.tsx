@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getGuestFirstName, getGuestInitials } from '@/lib/normalizers';
-import { useGuests } from '@/hooks';
+import { useGuests, useTenantAccess } from '@/hooks';
 import type { Guest } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
 
@@ -68,6 +68,8 @@ export default function KelompokKeluarga() {
   const currentEvent = useTenantStore((state) => state.currentEvent);
   const currentEventId = currentEvent?.id;
   const { guests, isLoading, error, refetch, createGuest } = useGuests(currentEventId);
+  const { access } = useTenantAccess();
+  const canWriteGuests = access?.permissions.includes('guest:write') ?? false;
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
@@ -136,6 +138,7 @@ export default function KelompokKeluarga() {
 
   const handleCreateHousehold = async () => {
     if (!formName.trim()) return;
+    if (!canWriteGuests) return;
     // Create a household by creating a guest with household data
     // The household name is stored in the subgroup field
     await createGuest({
@@ -208,6 +211,7 @@ export default function KelompokKeluarga() {
           <h1 className="text-2xl font-bold text-[#0f172a] dark:text-[#f8fafc]">Kelompok Keluarga</h1>
           <p className="text-sm text-[#64748b] mt-0.5">{households.length} kelompok terdaftar</p>
         </div>
+        {canWriteGuests && (
         <div className="flex items-center gap-3">
           <button onClick={() => setShowCreate(true)}
             className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-[#4f46e5] text-white text-sm font-medium hover:bg-[#6366f1] hover:scale-[1.02] active:scale-[0.96] transition-all">
@@ -215,6 +219,7 @@ export default function KelompokKeluarga() {
             Buat Kelompok
           </button>
         </div>
+        )}
       </div>
 
       {/* ── Filter Bar ── */}
