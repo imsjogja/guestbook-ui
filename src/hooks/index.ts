@@ -14,3 +14,4 @@ export { useCampaigns } from './useCampaigns';
 export { useMessages } from './useMessages';
 export { useWhatsAppMessaging } from './useWhatsAppMessaging';
 export { useTeam } from './useTeam';
+export { useGuestGifts } from './useGuestGifts';

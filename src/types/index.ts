@@ -116,6 +116,21 @@ export interface Guest {
   updatedAt: string;
 }
 
+export interface GuestGift {
+  id: string;
+  tenantId: string;
+  eventId: string;
+  guestId: string;
+  eventGuestId: string;
+  amount: number;
+  giftType: 'cash' | 'transfer' | 'goods' | 'other';
+  notes?: string;
+  receivedAt: string;
+  recordedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ── RSVP ──────────────────────────────────────────────
 
 export type RSVPStatus = 'attending' | 'not_attending' | 'maybe' | 'no_response';

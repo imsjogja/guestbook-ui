@@ -21,11 +21,13 @@ import {
   MapPin,
   Clock3,
   CheckCircle2,
+  CircleDollarSign,
+  AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getGuestInitials } from '@/lib/normalizers';
 import { useGuests, type GuestImportResult } from '@/hooks/useGuests';
-import { useCheckin, useRSVP, useSeating, useTemplates, useTenantAccess, useWhatsAppMessaging } from '@/hooks';
+import { useCheckin, useGuestGifts, useRSVP, useSeating, useTemplates, useTenantAccess, useWhatsAppMessaging } from '@/hooks';
 import {
   buildCheckinByGuestId,
   buildRsvpByGuestId,
@@ -35,6 +37,7 @@ import {
   getGuestTableName,
 } from '@/lib/guest-live-data';
 import type { Event, Guest } from '@/types';
+import { formatGiftAmount, parseGiftAmount } from '@/lib/guest-gift';
 import { toast } from 'sonner';
 import { useTenantStore } from '@/store/tenantStore';
 
@@ -107,6 +110,8 @@ function getEventStatusLabel(status: Event['status']) {
   }
 }
 
+type GiftSaveState = 'idle' | 'saving' | 'saved' | 'error';
+
 /* ─── Skeleton Row ─── */
 function SkeletonRow() {
   return (
@@ -119,6 +124,7 @@ function SkeletonRow() {
       <td className="px-4 py-3"><div className="h-3 w-16 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
       <td className="px-4 py-3"><div className="h-3 w-12 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
       <td className="px-4 py-3"><div className="h-3 w-24 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
+      <td className="px-4 py-3"><div className="h-3 w-28 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
       <td className="px-4 py-3"><div className="h-3 w-8 bg-[#e2e8f0] dark:bg-[#334155] rounded ml-auto" /></td>
     </tr>
   );
@@ -144,11 +150,20 @@ export default function Tamu() {
   } = useGuests(currentEventId);
   const { rsvps, refreshSilently: refreshRsvpsSilently } = useRSVP(currentEventId);
   const { checkins, refetch: refreshCheckins } = useCheckin(currentEventId, 100);
+  const {
+    giftByGuestId,
+    isLoading: isLoadingGifts,
+    upsertGift,
+    deleteGift,
+    refreshSilently: refreshGiftsSilently,
+  } = useGuestGifts(currentEventId);
   const { tables, refreshSilently: refreshTablesSilently } = useSeating();
   const { templates } = useTemplates();
   const { access, isLoading: isLoadingAccess } = useTenantAccess();
   const canWriteGuests = access?.permissions.includes('guest:write') ?? false;
   const canDeleteGuests = access?.permissions.includes('guest:delete') ?? false;
+  const canReadGifts = access?.permissions.includes('gift:read') ?? false;
+  const canManageGifts = access?.permissions.includes('gift:write') ?? false;
   const { sendWhatsApp, isSending: isSendingWhatsApp } = useWhatsAppMessaging();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -163,6 +178,8 @@ export default function Tamu() {
   const [templateDownloading, setTemplateDownloading] = useState(false);
   const [selectedImportFile, setSelectedImportFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<GuestImportResult | null>(null);
+  const [giftDrafts, setGiftDrafts] = useState<Record<string, string>>({});
+  const [giftSaveStates, setGiftSaveStates] = useState<Record<string, GiftSaveState>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* Pagination */
@@ -205,6 +222,7 @@ export default function Tamu() {
         refreshRsvpsSilently(),
         refreshTablesSilently(),
         refreshCheckins(),
+        refreshGiftsSilently(),
       ]);
     };
     const interval = window.setInterval(refresh, 10000);
@@ -213,7 +231,7 @@ export default function Tamu() {
       window.clearInterval(interval);
       window.removeEventListener('focus', refresh);
     };
-  }, [currentEventId, refreshGuestsSilently, refreshRsvpsSilently, refreshTablesSilently, refreshCheckins]);
+  }, [currentEventId, refreshGuestsSilently, refreshRsvpsSilently, refreshTablesSilently, refreshCheckins, refreshGiftsSilently]);
 
   /* ─── Segments from data ─── */
   const segments = useMemo(() => {
@@ -285,6 +303,46 @@ export default function Tamu() {
     setDeletingGuest(g);
     setShowDelete(true);
     setDropdownOpen(null);
+  };
+
+  const handleGiftChange = (guestId: string, value: string) => {
+    setGiftDrafts((previous) => ({ ...previous, [guestId]: value }));
+    setGiftSaveStates((previous) => ({ ...previous, [guestId]: 'idle' }));
+  };
+
+  const handleGiftSave = async (guestId: string) => {
+    if (!canManageGifts) return;
+    const existing = giftByGuestId.get(guestId);
+    const hasDraft = Object.prototype.hasOwnProperty.call(giftDrafts, guestId);
+    const rawValue = hasDraft ? giftDrafts[guestId] : existing ? String(existing.amount) : '';
+    const amount = parseGiftAmount(rawValue);
+
+    if (amount === 0 && !existing) {
+      setGiftDrafts((previous) => {
+        const next = { ...previous };
+        delete next[guestId];
+        return next;
+      });
+      return;
+    }
+    if (amount > 0 && existing?.amount === amount && !hasDraft) return;
+
+    setGiftSaveStates((previous) => ({ ...previous, [guestId]: 'saving' }));
+    try {
+      if (amount === 0) {
+        await deleteGift(guestId);
+      } else {
+        await upsertGift(guestId, { amount, gift_type: 'cash' });
+      }
+      setGiftDrafts((previous) => {
+        const next = { ...previous };
+        delete next[guestId];
+        return next;
+      });
+      setGiftSaveStates((previous) => ({ ...previous, [guestId]: 'saved' }));
+    } catch {
+      setGiftSaveStates((previous) => ({ ...previous, [guestId]: 'error' }));
+    }
   };
 
   const handleAdd = async () => {
@@ -691,6 +749,7 @@ export default function Tamu() {
                 <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">RSVP</th>
                 <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Meja</th>
                 <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Check-in</th>
+                <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Angpau</th>
                 <th className="text-right px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Aksi</th>
               </tr>
             </thead>
@@ -711,6 +770,8 @@ export default function Tamu() {
                       const r = getRsvpLabel(getGuestRsvpStatus(g, rsvpByGuestId));
                       const tableName = getGuestTableName(g, tableByGuestId);
                       const checkin = getGuestCheckin(g, checkinByGuestId);
+                      const gift = giftByGuestId.get(g.id);
+                      const giftSaveState = giftSaveStates[g.id] ?? 'idle';
                       return (
                         <motion.tr key={g.id}
                           initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
@@ -769,6 +830,49 @@ export default function Tamu() {
                               </span>
                             )}
                           </td>
+                          <td className="px-4 py-3 min-w-[190px]">
+                            {!canReadGifts ? (
+                              <span className="text-sm text-[#94a3b8]">-</span>
+                            ) : canManageGifts ? (
+                              <div className="space-y-1">
+                                <div className="relative">
+                                  <CircleDollarSign size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#94a3b8]" />
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={giftDrafts[g.id] ?? (gift ? String(gift.amount) : '')}
+                                    onChange={(event) => handleGiftChange(g.id, event.target.value)}
+                                    onBlur={() => { void handleGiftSave(g.id); }}
+                                    onKeyDown={(event) => {
+                                      if (event.key === 'Enter') event.currentTarget.blur();
+                                      if (event.key === 'Escape') {
+                                        setGiftDrafts((previous) => {
+                                          const next = { ...previous };
+                                          delete next[g.id];
+                                          return next;
+                                        });
+                                        event.currentTarget.blur();
+                                      }
+                                    }}
+                                    disabled={!checkin || isLoadingGifts}
+                                    placeholder={checkin ? 'Nominal angpau' : 'Check-in dahulu'}
+                                    title={!checkin ? 'Tamu perlu check-in sebelum mencatat angpau' : 'Kosongkan untuk menghapus data angpau'}
+                                    className="h-9 w-full rounded-lg border border-[#e2e8f0] bg-white pl-8 pr-2 text-sm text-[#1e293b] outline-none transition-colors placeholder:text-[#94a3b8] focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20 disabled:cursor-not-allowed disabled:bg-[#f8fafc] disabled:text-[#64748b] dark:border-[#334155] dark:bg-[#151c2c] dark:text-[#f8fafc] dark:disabled:bg-[#1e293b]"
+                                  />
+                                </div>
+                                <div className="flex min-h-3 items-center gap-1 text-[10px]">
+                                  {giftSaveState === 'saving' && <><Loader2 size={11} className="animate-spin text-[#4f46e5]" /> <span className="text-[#4f46e5]">Menyimpan...</span></>}
+                                  {giftSaveState === 'saved' && <><CheckCircle2 size={11} className="text-[#059669]" /> <span className="text-[#059669]">Tersimpan</span></>}
+                                  {giftSaveState === 'error' && <><AlertCircle size={11} className="text-[#e11d48]" /> <span className="text-[#e11d48]">Gagal menyimpan</span></>}
+                                  {giftSaveState === 'idle' && !checkin && <span className="text-[#94a3b8]">Tunggu check-in</span>}
+                                </div>
+                              </div>
+                            ) : gift ? (
+                              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#059669]">Rp {formatGiftAmount(gift.amount)}</span>
+                            ) : (
+                              <span className="text-sm text-[#94a3b8]">Belum dicatat</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               {canWriteGuests && (
@@ -823,7 +927,7 @@ export default function Tamu() {
                   </AnimatePresence>
                   {paginated.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="text-center py-12">
+                      <td colSpan={10} className="text-center py-12">
                         <Users size={40} className="mx-auto text-[#e2e8f0] mb-3" />
                         <p className="text-sm text-[#64748b]">Tidak ada tamu yang cocok</p>
                         <p className="text-xs text-[#94a3b8] mt-1">Coba ubah filter atau kata kunci pencarian</p>
