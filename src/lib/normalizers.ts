@@ -82,6 +82,7 @@ type BackendInvitation = {
 type BackendCheckin = {
   id: string;
   guest_id: string;
+  event_guest_id?: string | null;
   event_id: string;
   method?: string | null;
   status?: string | null;
@@ -344,7 +345,11 @@ export function normalizeGuestDetail(raw: BackendGuest) {
   const checkins = (raw.checkins ?? []).map((ci) => ({
     id: ci.id,
     guestId: ci.guest_id,
+    eventGuestId: ci.event_guest_id ?? undefined,
     eventId: ci.event_id,
+    status: ci.status === 'success' || ci.status === 'duplicate' || ci.status === 'invalid' || ci.status === 'revoked' || ci.status === 'wrong_event' || ci.status === 'expired'
+      ? ci.status
+      : undefined,
     checkinMethod: normalizeCheckinMethod(ci.method),
     checkedInBy: ci.checked_in_by ?? 'System',
     checkedInAt: ci.checked_in_at ?? ci.created_at ?? raw.created_at,

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { Guest, RSVP, Table } from '@/types';
-import { buildRsvpByGuestId, buildTableByGuestId, getGuestRsvpStatus, getGuestTableName } from './guest-live-data';
+import type { Checkin, Guest, RSVP, Table } from '@/types';
+import {
+  buildCheckinByGuestId,
+  buildRsvpByGuestId,
+  buildTableByGuestId,
+  getGuestCheckin,
+  getGuestRsvpStatus,
+  getGuestTableName,
+} from './guest-live-data';
 
 const guest: Guest = {
   id: 'guest-1',
@@ -38,5 +45,21 @@ describe('guest live data joins', () => {
 
     expect(getGuestRsvpStatus(guest, buildRsvpByGuestId([rsvp]))).toBe('maybe');
     expect(getGuestTableName(guest, buildTableByGuestId([table]))).toBe('Meja 1');
+  });
+
+  it('joins only successful check-ins and supports the event guest id', () => {
+    const failed: Checkin = {
+      id: 'checkin-failed', guestId: 'guest-1', eventId: 'event-1', status: 'duplicate',
+      checkinMethod: 'qr', checkedInBy: 'System', checkedInAt: '2026-07-22T08:00:00Z',
+    };
+    const successful: Checkin = {
+      id: 'checkin-success', guestId: 'guest-1', eventGuestId: 'event-guest-1', eventId: 'event-1', status: 'success',
+      checkinMethod: 'qr', checkedInBy: 'System', checkedInAt: '2026-07-22T08:01:00Z',
+    };
+
+    const map = buildCheckinByGuestId([failed, successful]);
+    expect(getGuestCheckin(guest, map)?.id).toBe('checkin-success');
+    expect(getGuestCheckin({ ...guest, id: 'other', eventGuestId: 'event-guest-1' }, map)?.id).toBe('checkin-success');
+    expect(getGuestCheckin({ ...guest, id: 'other', eventGuestId: 'other-event-guest' }, map)).toBeUndefined();
   });
 });

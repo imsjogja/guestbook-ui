@@ -56,6 +56,7 @@ type BackendGuestDetail = {
   checkins?: Array<{
     id: string;
     guest_id: string;
+    event_guest_id?: string | null;
     event_id: string;
     method?: string | null;
     status?: string | null;

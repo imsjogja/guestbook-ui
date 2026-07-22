@@ -17,13 +17,24 @@ import {
   Users,
   Filter,
   Loader2,
+  CalendarDays,
+  MapPin,
+  Clock3,
+  CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getGuestInitials } from '@/lib/normalizers';
 import { useGuests, type GuestImportResult } from '@/hooks/useGuests';
-import { useRSVP, useSeating, useTemplates, useTenantAccess, useWhatsAppMessaging } from '@/hooks';
-import { buildRsvpByGuestId, buildTableByGuestId, getGuestRsvpStatus, getGuestTableName } from '@/lib/guest-live-data';
-import type { Guest } from '@/types';
+import { useCheckin, useRSVP, useSeating, useTemplates, useTenantAccess, useWhatsAppMessaging } from '@/hooks';
+import {
+  buildCheckinByGuestId,
+  buildRsvpByGuestId,
+  buildTableByGuestId,
+  getGuestCheckin,
+  getGuestRsvpStatus,
+  getGuestTableName,
+} from '@/lib/guest-live-data';
+import type { Event, Guest } from '@/types';
 import { toast } from 'sonner';
 import { useTenantStore } from '@/store/tenantStore';
 
@@ -57,6 +68,45 @@ function getRsvpLabel(status: string) {
   return rsvpConfig[status] || rsvpConfig['no_response'];
 }
 
+function formatEventSchedule(event: Event) {
+  const date = new Date(event.startDate);
+  if (Number.isNaN(date.getTime())) return 'Jadwal belum ditentukan';
+  const formattedDate = new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+  const formattedTime = new Intl.DateTimeFormat('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+  return `${formattedDate} · ${formattedTime} WIB`;
+}
+
+function formatCheckinTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+}
+
+function getEventStatusLabel(status: Event['status']) {
+  switch (status) {
+    case 'published': return 'Dipublikasikan';
+    case 'ongoing': return 'Sedang Berlangsung';
+    case 'completed': return 'Selesai';
+    case 'cancelled': return 'Dibatalkan';
+    case 'archived': return 'Diarsipkan';
+    default: return 'Draft';
+  }
+}
+
 /* ─── Skeleton Row ─── */
 function SkeletonRow() {
   return (
@@ -68,6 +118,7 @@ function SkeletonRow() {
       <td className="px-4 py-3"><div className="h-3 w-20 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
       <td className="px-4 py-3"><div className="h-3 w-16 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
       <td className="px-4 py-3"><div className="h-3 w-12 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
+      <td className="px-4 py-3"><div className="h-3 w-24 bg-[#e2e8f0] dark:bg-[#334155] rounded" /></td>
       <td className="px-4 py-3"><div className="h-3 w-8 bg-[#e2e8f0] dark:bg-[#334155] rounded ml-auto" /></td>
     </tr>
   );
@@ -76,7 +127,8 @@ function SkeletonRow() {
 /* ─── Component ─── */
 export default function Tamu() {
   const navigate = useNavigate();
-  const currentEventId = useTenantStore((state) => state.currentEvent?.id);
+  const currentEvent = useTenantStore((state) => state.currentEvent);
+  const currentEventId = currentEvent?.id;
   const {
     guests,
     total,
@@ -91,6 +143,7 @@ export default function Tamu() {
     exportGuestsCSV,
   } = useGuests(currentEventId);
   const { rsvps, refreshSilently: refreshRsvpsSilently } = useRSVP(currentEventId);
+  const { checkins, refetch: refreshCheckins } = useCheckin(currentEventId, 100);
   const { tables, refreshSilently: refreshTablesSilently } = useSeating();
   const { templates } = useTemplates();
   const { access, isLoading: isLoadingAccess } = useTenantAccess();
@@ -139,6 +192,7 @@ export default function Tamu() {
 
   const rsvpByGuestId = useMemo(() => buildRsvpByGuestId(rsvps), [rsvps]);
   const tableByGuestId = useMemo(() => buildTableByGuestId(tables), [tables]);
+  const checkinByGuestId = useMemo(() => buildCheckinByGuestId(checkins), [checkins]);
 
   // Keep the roster join current after RSVP, seating, check-in, or invitation
   // actions are performed in another tab or on an operator's device.
@@ -150,6 +204,7 @@ export default function Tamu() {
         refreshGuestsSilently(),
         refreshRsvpsSilently(),
         refreshTablesSilently(),
+        refreshCheckins(),
       ]);
     };
     const interval = window.setInterval(refresh, 10000);
@@ -158,7 +213,7 @@ export default function Tamu() {
       window.clearInterval(interval);
       window.removeEventListener('focus', refresh);
     };
-  }, [currentEventId, refreshGuestsSilently, refreshRsvpsSilently, refreshTablesSilently]);
+  }, [currentEventId, refreshGuestsSilently, refreshRsvpsSilently, refreshTablesSilently, refreshCheckins]);
 
   /* ─── Segments from data ─── */
   const segments = useMemo(() => {
@@ -498,12 +553,33 @@ export default function Tamu() {
       </AnimatePresence>
 
       {/* ── Page Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0f172a] dark:text-[#f8fafc]">Daftar Tamu</h1>
           <p className="text-sm text-[#64748b] mt-0.5">{total.toLocaleString('id-ID')} tamu terdaftar</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 xl:flex-1 xl:justify-end">
+          {currentEvent && (
+            <div className="flex min-w-0 items-center gap-3 rounded-xl border border-[#c7d2fe] bg-[#eef2ff] px-3 py-2.5 dark:border-[#4338ca] dark:bg-[rgba(79,70,229,0.12)]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#4f46e5] shadow-sm dark:bg-[#151c2c]">
+                <CalendarDays size={17} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6366f1]">Data acara</p>
+                <p className="truncate text-sm font-semibold text-[#3730a3] dark:text-[#c7d2fe]">{currentEvent.name}</p>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[#64748b]">
+                  <span className="inline-flex items-center gap-1"><Clock3 size={12} />{formatEventSchedule(currentEvent)}</span>
+                  {(currentEvent.location || currentEvent.address) && (
+                    <span className="inline-flex min-w-0 items-center gap-1 truncate"><MapPin size={12} />{currentEvent.location || currentEvent.address}</span>
+                  )}
+                </div>
+              </div>
+              <span className="ml-auto shrink-0 rounded-full border border-[#c7d2fe] bg-white/70 px-2 py-0.5 text-[10px] font-medium text-[#4f46e5] dark:border-[#4338ca] dark:bg-[#151c2c] dark:text-[#c7d2fe]">
+                {getEventStatusLabel(currentEvent.status)}
+              </span>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
           {canWriteGuests && (
           <button onClick={openAdd}
             disabled={isLoading || isLoadingAccess}
@@ -535,6 +611,7 @@ export default function Tamu() {
               Hapus ({selectedIds.size})
             </button>
           )}
+          </div>
         </div>
       </div>
 
@@ -613,6 +690,7 @@ export default function Tamu() {
                 <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Segmen</th>
                 <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">RSVP</th>
                 <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Meja</th>
+                <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Check-in</th>
                 <th className="text-right px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">Aksi</th>
               </tr>
             </thead>
@@ -632,6 +710,7 @@ export default function Tamu() {
                       const t = getTypeConfig(g);
                       const r = getRsvpLabel(getGuestRsvpStatus(g, rsvpByGuestId));
                       const tableName = getGuestTableName(g, tableByGuestId);
+                      const checkin = getGuestCheckin(g, checkinByGuestId);
                       return (
                         <motion.tr key={g.id}
                           initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
@@ -674,6 +753,21 @@ export default function Tamu() {
                           </td>
                           <td className="px-4 py-3">
                             <span className="text-sm text-[#64748b]">{tableName || 'Belum Diatur'}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {checkin ? (
+                              <span className="inline-flex flex-col items-start gap-0.5">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#a7f3d0] bg-[#d1fae5] px-2 py-0.5 text-xs font-medium text-[#059669]">
+                                  <CheckCircle2 size={12} />
+                                  Sudah Check-in
+                                </span>
+                                <span className="pl-1 text-[10px] text-[#94a3b8]">{formatCheckinTime(checkin.checkedInAt)}</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-2 py-0.5 text-xs font-medium text-[#64748b] dark:border-[#475569] dark:bg-[#1e293b]">
+                                Belum Check-in
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -729,7 +823,7 @@ export default function Tamu() {
                   </AnimatePresence>
                   {paginated.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="text-center py-12">
+                      <td colSpan={9} className="text-center py-12">
                         <Users size={40} className="mx-auto text-[#e2e8f0] mb-3" />
                         <p className="text-sm text-[#64748b]">Tidak ada tamu yang cocok</p>
                         <p className="text-xs text-[#94a3b8] mt-1">Coba ubah filter atau kata kunci pencarian</p>

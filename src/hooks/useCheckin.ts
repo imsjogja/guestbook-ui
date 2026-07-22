@@ -13,8 +13,10 @@ interface CheckinStats {
 interface ApiCheckin {
   id: string;
   guest_id: string;
+  event_guest_id?: string | null;
   event_id: string;
   method?: string;
+  status?: Checkin['status'];
   created_at?: string;
   createdAt?: string;
   officer_id?: string | null;
@@ -59,7 +61,9 @@ function normalizeCheckin(item: ApiCheckin): Checkin {
   return {
     id: item.id,
     guestId: item.guest_id,
+    eventGuestId: item.event_guest_id ?? undefined,
     eventId: item.event_id,
+    status: item.status,
     checkinMethod: normalizeCheckinMethod(item.method),
     checkedInBy: item.officer_id ?? 'System',
     checkedInAt: item.created_at ?? item.createdAt ?? new Date().toISOString(),
@@ -86,7 +90,7 @@ function normalizeStats(data?: ApiCheckinStats): CheckinStats {
   };
 }
 
-export function useCheckin(eventId?: string) {
+export function useCheckin(eventId?: string, recentLimit = 20) {
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
   const activeEventId = eventId ?? currentEventId;
   const { access, isLoading: isLoadingAccess } = useEventAccess();
@@ -124,7 +128,7 @@ export function useCheckin(eventId?: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const params = activeEventId ? { eventId: activeEventId } : {};
+      const params = activeEventId ? { eventId: activeEventId, limit: recentLimit } : {};
       const [checkinsRes, statsRes] = await Promise.allSettled([
         api.get<{ data: ApiCheckin[] }>('/checkins', { params }),
         api.get<{ data: ApiCheckinStats }>('/checkins/stats', { params }),
@@ -151,7 +155,7 @@ export function useCheckin(eventId?: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [access, activeEventId, isLoadingAccess]);
+  }, [access, activeEventId, isLoadingAccess, recentLimit]);
 
   useEffect(() => {
     fetchCheckins();

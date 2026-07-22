@@ -147,7 +147,9 @@ export interface RSVPBreakdown {
 export interface Checkin {
   id: string;
   guestId: string;
+  eventGuestId?: string;
   eventId: string;
+  status?: 'success' | 'duplicate' | 'invalid' | 'revoked' | 'wrong_event' | 'expired';
   checkinMethod: 'qr' | 'manual' | 'walk_in';
   checkedInBy: string;
   checkedInAt: string;
