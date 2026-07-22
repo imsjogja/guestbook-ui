@@ -122,7 +122,7 @@ export interface GuestGift {
   eventId: string;
   guestId: string;
   eventGuestId: string;
-  amount: number;
+  amount?: number;
   giftType: 'cash' | 'transfer' | 'goods' | 'other';
   notes?: string;
   receivedAt: string;

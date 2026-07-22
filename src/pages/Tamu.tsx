@@ -37,7 +37,7 @@ import {
   getGuestTableName,
 } from '@/lib/guest-live-data';
 import type { Event, Guest } from '@/types';
-import { formatGiftAmount, parseGiftAmount } from '@/lib/guest-gift';
+import { formatGiftAmount, getGiftTypeLabel, parseGiftAmount } from '@/lib/guest-gift';
 import { toast } from 'sonner';
 import { useTenantStore } from '@/store/tenantStore';
 
@@ -314,7 +314,7 @@ export default function Tamu() {
     if (!canManageGifts) return;
     const existing = giftByGuestId.get(guestId);
     const hasDraft = Object.prototype.hasOwnProperty.call(giftDrafts, guestId);
-    const rawValue = hasDraft ? giftDrafts[guestId] : existing ? String(existing.amount) : '';
+    const rawValue = hasDraft ? giftDrafts[guestId] : existing?.amount ? String(existing.amount) : '';
     const amount = parseGiftAmount(rawValue);
 
     if (amount === 0 && !existing) {
@@ -833,14 +833,14 @@ export default function Tamu() {
                           <td className="px-4 py-3 min-w-[190px]">
                             {!canReadGifts ? (
                               <span className="text-sm text-[#94a3b8]">-</span>
-                            ) : canManageGifts ? (
+                            ) : canManageGifts && (!gift || gift.giftType === 'cash') ? (
                               <div className="space-y-1">
                                 <div className="relative">
                                   <CircleDollarSign size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#94a3b8]" />
                                   <input
                                     type="text"
                                     inputMode="numeric"
-                                    value={giftDrafts[g.id] ?? (gift ? String(gift.amount) : '')}
+                                    value={giftDrafts[g.id] ?? (gift?.amount ? String(gift.amount) : '')}
                                     onChange={(event) => handleGiftChange(g.id, event.target.value)}
                                     onBlur={() => { void handleGiftSave(g.id); }}
                                     onKeyDown={(event) => {
@@ -868,7 +868,10 @@ export default function Tamu() {
                                 </div>
                               </div>
                             ) : gift ? (
-                              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#059669]">Rp {formatGiftAmount(gift.amount)}</span>
+                              <span className="inline-flex flex-col items-start gap-0.5 text-sm font-medium text-[#059669]">
+                                <span>{getGiftTypeLabel(gift.giftType)}{gift.amount ? ` · Rp ${formatGiftAmount(gift.amount)}` : ''}</span>
+                                {canManageGifts && <button type="button" onClick={() => navigate('/gift')} className="text-[10px] font-medium text-[#4f46e5] hover:underline">Kelola di Gift</button>}
+                              </span>
                             ) : (
                               <span className="text-sm text-[#94a3b8]">Belum dicatat</span>
                             )}

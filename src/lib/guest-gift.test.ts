@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGiftMap, formatGiftAmount, parseGiftAmount } from './guest-gift';
+import { buildGiftMap, formatGiftAmount, getGiftTypeLabel, parseGiftAmount } from './guest-gift';
 
 describe('guest gift helpers', () => {
   it('parses formatted rupiah input into an integer amount', () => {
@@ -19,5 +19,12 @@ describe('guest gift helpers', () => {
       receivedAt: '', createdAt: '', updatedAt: '',
     };
     expect(buildGiftMap([gift]).get('guest-1')?.amount).toBe(100000);
+  });
+
+  it('labels every supported gift type', () => {
+    expect(getGiftTypeLabel('cash')).toBe('Tunai');
+    expect(getGiftTypeLabel('transfer')).toBe('Transfer');
+    expect(getGiftTypeLabel('goods')).toBe('Kado');
+    expect(getGiftTypeLabel('other')).toBe('Lainnya');
   });
 });

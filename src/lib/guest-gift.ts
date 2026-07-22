@@ -6,7 +6,7 @@ export type BackendGuestGift = {
   event_id: string;
   guest_id: string;
   event_guest_id: string;
-  amount: number;
+  amount?: number | null;
   gift_type?: string | null;
   notes?: string | null;
   received_at: string;
@@ -22,7 +22,7 @@ export function normalizeGuestGift(raw: BackendGuestGift): GuestGift {
     eventId: raw.event_id,
     guestId: raw.guest_id,
     eventGuestId: raw.event_guest_id,
-    amount: Number(raw.amount) || 0,
+    amount: raw.amount == null ? undefined : Number(raw.amount) || 0,
     giftType: raw.gift_type === 'transfer' || raw.gift_type === 'goods' || raw.gift_type === 'other'
       ? raw.gift_type
       : 'cash',
@@ -43,6 +43,16 @@ export function parseGiftAmount(value: string): number {
 
 export function formatGiftAmount(value: number): string {
   return new Intl.NumberFormat('id-ID').format(value);
+}
+
+export function getGiftTypeLabel(value: GuestGift['giftType']): string {
+  switch (value) {
+    case 'cash': return 'Tunai';
+    case 'transfer': return 'Transfer';
+    case 'goods': return 'Kado';
+    case 'other': return 'Lainnya';
+    default: return 'Gift';
+  }
 }
 
 export function buildGiftMap(gifts: GuestGift[]): Map<string, GuestGift> {

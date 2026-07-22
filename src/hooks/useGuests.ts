@@ -167,7 +167,7 @@ async function searchExistingMasterGuest(data: Partial<Guest>): Promise<BackendG
   return matches.values().next().value ?? null;
 }
 
-export function useGuests(eventId?: string) {
+export function useGuests(eventId?: string, options?: { perPage?: number; all?: boolean }) {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -177,15 +177,32 @@ export function useGuests(eventId?: string) {
     if (!silent) setIsLoading(true);
     setError(null);
     try {
-      const params = eventId ? { status: 'active' } : {};
-      const response = eventId
-        ? await api.get<PaginatedBackendEventGuestResponse>('/event-guests', { params })
-        : await api.get<PaginatedBackendGuestResponse>('/guests', { params });
-      const normalized: Guest[] = eventId
-        ? (response.data as PaginatedBackendEventGuestResponse).data.map(normalizeEventGuest)
-        : (response.data as PaginatedBackendGuestResponse).data.map(normalizeGuest);
+      const perPage = Math.min(options?.perPage ?? 20, 100);
+      const loadPage = async (page: number) => {
+        const params = eventId
+          ? { status: 'active', page, per_page: perPage }
+          : { page, per_page: perPage };
+        const response = eventId
+          ? await api.get<PaginatedBackendEventGuestResponse>('/event-guests', { params })
+          : await api.get<PaginatedBackendGuestResponse>('/guests', { params });
+        const normalized: Guest[] = eventId
+          ? (response.data as PaginatedBackendEventGuestResponse).data.map(normalizeEventGuest)
+          : (response.data as PaginatedBackendGuestResponse).data.map(normalizeGuest);
+        return { normalized, meta: response.data.meta };
+      };
+
+      const firstPage = await loadPage(1);
+      const normalized = [...firstPage.normalized];
+      let totalPages = firstPage.meta?.total_pages ?? 1;
+      if (options?.all && totalPages > 1) {
+        for (let page = 2; page <= totalPages; page += 1) {
+          const nextPage = await loadPage(page);
+          normalized.push(...nextPage.normalized);
+          totalPages = nextPage.meta?.total_pages ?? totalPages;
+        }
+      }
       setGuests(normalized);
-      setTotal(response.data.meta?.total ?? normalized.length);
+      setTotal(firstPage.meta?.total ?? normalized.length);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       const msg = axiosErr.response?.data?.message ?? 'Gagal memuat tamu';
@@ -193,7 +210,7 @@ export function useGuests(eventId?: string) {
     } finally {
       if (!silent) setIsLoading(false);
     }
-  }, [eventId]);
+  }, [eventId, options?.all, options?.perPage]);
 
   useEffect(() => {
     fetchGuests();

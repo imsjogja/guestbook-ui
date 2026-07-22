@@ -24,6 +24,7 @@ import Tim from './pages/Tim';
 import TimAcara from './pages/TimAcara';
 import Pengaturan from './pages/Pengaturan';
 import Plan from './pages/Plan';
+import Gift from './pages/Gift';
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
         <Route element={<EventRequired />}>
           <Route index element={<Dashboard />} />
           <Route path="tamu" element={<Tamu />} />
+          <Route path="gift" element={<Gift />} />
           <Route path="tamu/:id" element={<TamuDetail />} />
           <Route path="kelompok-keluarga" element={<KelompokKeluarga />} />
           <Route path="undangan" element={<Undangan />} />

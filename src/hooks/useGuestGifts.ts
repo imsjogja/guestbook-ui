@@ -6,7 +6,7 @@ import type { ApiResponse, GuestGift } from '@/types';
 type GuestGiftListResponse = ApiResponse<BackendGuestGift[]>;
 
 type GuestGiftPayload = {
-  amount: number;
+  amount?: number;
   gift_type?: 'cash' | 'transfer' | 'goods' | 'other';
   notes?: string;
 };
