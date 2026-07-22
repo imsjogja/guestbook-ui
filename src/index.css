@@ -4,6 +4,32 @@
 @tailwind components;
 @tailwind utilities;
 
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .qr-modal-overlay,
+  .qr-modal-overlay #event-checkin-qr-print,
+  .qr-modal-overlay #event-checkin-qr-print * {
+    visibility: visible !important;
+  }
+
+  .qr-modal-overlay {
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .qr-modal-content {
+    position: static !important;
+    max-width: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
 @layer base {
   :root {
     --background: 210 40% 98%;

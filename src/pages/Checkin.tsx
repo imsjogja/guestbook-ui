@@ -60,6 +60,13 @@ function getStatusIcon(status: string) {
   }
 }
 
+function getCheckinMethodLabel(method: string): string {
+  if (method === 'self_service') return 'Mandiri';
+  if (method === 'qr') return 'Scan QR';
+  if (method === 'manual') return 'Manual';
+  return 'Walk-in';
+}
+
 function formatTimeAgo(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
@@ -766,7 +773,7 @@ function RecentTab({ checkins, isLoading }: { checkins: import('@/types').Checki
               </span>
               <span className="text-[#e2e8f0]">|</span>
               <span className="text-xs text-[#94a3b8]">
-                {item.checkinMethod === 'qr' ? 'Scan QR' : item.checkinMethod === 'manual' ? 'Manual' : 'Walk-in'}
+              {getCheckinMethodLabel(item.checkinMethod)}
               </span>
             </div>
           </div>
@@ -953,7 +960,7 @@ export default function Checkin() {
                               {new Date(item.checkedInAt).toLocaleTimeString('id-ID', { hour12: false })}
                             </span>
                             <span className="text-[11px] text-[#94a3b8]">
-                              {item.checkinMethod === 'qr' ? 'Scan QR' : item.checkinMethod === 'manual' ? 'Manual' : 'Walk-in'}
+                          {getCheckinMethodLabel(item.checkinMethod)}
                             </span>
                           </div>
                         </div>

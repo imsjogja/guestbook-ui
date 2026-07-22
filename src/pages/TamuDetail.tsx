@@ -86,6 +86,14 @@ const deliveryStatusLabels: Record<string, string> = {
   failed: 'Gagal',
 };
 
+function getCheckinMethodLabel(method: string): string {
+  if (method === 'self_service' || method === 'kiosk') return 'Mandiri';
+  if (method === 'qr' || method === 'qr_scan') return 'Scan QR';
+  if (method === 'manual' || method === 'manual_search') return 'Manual';
+  if (method === 'walk_in') return 'Walk-in';
+  return method || '-';
+}
+
 const invitationStatusLabels: Record<string, string> = {
   draft: 'Draft',
   opened: 'Dibuka',
@@ -837,7 +845,7 @@ export default function TamuDetail() {
                       {format(new Date(checkins[0].checkedInAt), 'd MMM yyyy, HH:mm', { locale: idID })}
                       {' '}WIB
                     </p>
-                    <p className="text-xs text-[#94a3b8] mt-0.5">Metode: {checkins[0].checkinMethod}</p>
+                    <p className="text-xs text-[#94a3b8] mt-0.5">Metode: {getCheckinMethodLabel(checkins[0].checkinMethod)}</p>
                   </div>
                 </div>
               ) : (
@@ -877,7 +885,7 @@ export default function TamuDetail() {
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#d1fae5] text-[#059669] border border-[#a7f3d0]">
                             <ScanLine size={11} />
-                            {ci.checkinMethod}
+                            {getCheckinMethodLabel(ci.checkinMethod)}
                           </span>
                         </td>
                       </tr>

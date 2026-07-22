@@ -7,7 +7,7 @@ import { useEventAccess } from './useEventAccess';
 interface CheckinStats {
   totalToday: number;
   total: number;
-  byMethod: { qr: number; manual: number; walkIn: number };
+  byMethod: { qr: number; manual: number; selfService: number; walkIn: number };
 }
 
 interface ApiCheckin {
@@ -49,9 +49,11 @@ function normalizeCheckinMethod(method?: string): Checkin['checkinMethod'] {
       return 'qr';
     case 'walk_in':
       return 'walk_in';
+    case 'kiosk':
+    case 'self_service':
+      return 'self_service';
     case 'manual_search':
     case 'manual':
-    case 'kiosk':
     default:
       return 'manual';
   }
@@ -73,11 +75,12 @@ function normalizeCheckin(item: ApiCheckin): Checkin {
 }
 
 function normalizeStats(data?: ApiCheckinStats): CheckinStats {
-  const byMethodBase = { qr: 0, manual: 0, walkIn: 0 };
+  const byMethodBase = { qr: 0, manual: 0, selfService: 0, walkIn: 0 };
   const byMethod = (data?.by_method ?? []).reduce((acc, item) => {
     const method = normalizeCheckinMethod(item.method);
     const count = item.count ?? 0;
     if (method === 'qr') acc.qr += count;
+    else if (method === 'self_service') acc.selfService += count;
     else if (method === 'walk_in') acc.walkIn += count;
     else acc.manual += count;
     return acc;
@@ -98,7 +101,7 @@ export function useCheckin(eventId?: string, recentLimit = 20) {
   const [stats, setStats] = useState<CheckinStats>({
     totalToday: 0,
     total: 0,
-    byMethod: { qr: 0, manual: 0, walkIn: 0 },
+    byMethod: { qr: 0, manual: 0, selfService: 0, walkIn: 0 },
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +109,7 @@ export function useCheckin(eventId?: string, recentLimit = 20) {
   const fetchCheckins = useCallback(async () => {
     if (!activeEventId) {
       setCheckins([]);
-      setStats({ totalToday: 0, total: 0, byMethod: { qr: 0, manual: 0, walkIn: 0 } });
+      setStats({ totalToday: 0, total: 0, byMethod: { qr: 0, manual: 0, selfService: 0, walkIn: 0 } });
       setError(null);
       setIsLoading(false);
       return;
@@ -119,7 +122,7 @@ export function useCheckin(eventId?: string, recentLimit = 20) {
 
     if (!access?.permissions.includes('checkin:read')) {
       setCheckins([]);
-      setStats({ totalToday: 0, total: 0, byMethod: { qr: 0, manual: 0, walkIn: 0 } });
+      setStats({ totalToday: 0, total: 0, byMethod: { qr: 0, manual: 0, selfService: 0, walkIn: 0 } });
       setError(null);
       setIsLoading(false);
       return;
@@ -143,7 +146,7 @@ export function useCheckin(eventId?: string, recentLimit = 20) {
       if (statsRes.status === 'fulfilled') {
         setStats(normalizeStats(statsRes.value.data.data));
       } else {
-        setStats({ totalToday: 0, total: 0, byMethod: { qr: 0, manual: 0, walkIn: 0 } });
+        setStats({ totalToday: 0, total: 0, byMethod: { qr: 0, manual: 0, selfService: 0, walkIn: 0 } });
       }
 
       if (checkinsRes.status === 'rejected' && statsRes.status === 'rejected') {

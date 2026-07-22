@@ -15,6 +15,8 @@ import {
   MapPin,
   ChevronDown,
   Loader2,
+  QrCode,
+  Printer,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -22,6 +24,8 @@ import { cn } from '@/lib/utils';
 import { useEvents } from '@/hooks/useEvents';
 import type { Event } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
+import { QRCodeSVG, downloadQRCodeSvg } from '@/components/QRCodeSVG';
+import { useEventCheckinQR } from '@/hooks';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -76,7 +80,9 @@ export default function Acara() {
   const [showDelete, setShowDelete] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null);
+  const [qrEvent, setQrEvent] = useState<Event | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { qr, isLoading: isLoadingQR, error: qrError, refetch: refetchQR } = useEventCheckinQR(qrEvent?.id);
 
   const openEventGuests = (event: Event) => {
     setCurrentEvent(event);
@@ -150,6 +156,20 @@ export default function Acara() {
     setDeletingEvent(evt);
     setShowDelete(true);
     setDropdownOpen(null);
+  };
+
+  const openCheckinQR = (evt: Event) => {
+    setQrEvent(evt);
+    setDropdownOpen(null);
+  };
+
+  const downloadEventQR = async () => {
+    if (!qr?.url || !qrEvent) return;
+    try {
+      await downloadQRCodeSvg(qr.url, `qr-checkin-mandiri-${qrEvent.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}.svg`, 800);
+    } catch {
+      setErrorToast('Gagal mengunduh QR acara');
+    }
   };
 
   const handleCreate = async () => {
@@ -543,6 +563,13 @@ export default function Acara() {
                               >
                                 <Users size={15} />
                               </button>
+                              <button
+                                onClick={() => openCheckinQR(evt)}
+                                className="p-1.5 rounded-md hover:bg-[#ecfdf5] dark:hover:bg-[rgba(16,185,129,0.12)] text-[#64748b] hover:text-[#059669] transition-colors"
+                                title="QR Check-in Mandiri"
+                              >
+                                <QrCode size={15} />
+                              </button>
                               <div className="relative">
                                 <button
                                   onClick={() => setDropdownOpen(dropdownOpen === evt.id ? null : evt.id)}
@@ -653,6 +680,75 @@ export default function Acara() {
                 >
                   {submitting && <Loader2 size={16} className="animate-spin" />}
                   Simpan
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Self Check-in QR Modal ── */}
+      <AnimatePresence>
+        {qrEvent && (
+          <div className="qr-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[rgba(15,23,42,0.5)] backdrop-blur-sm"
+              onClick={() => setQrEvent(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2, ease: easeOutExpo }}
+              className="qr-modal-content relative w-full max-w-lg bg-white dark:bg-[#151c2c] rounded-2xl shadow-[0_24px_48px_rgba(15,23,42,0.18)] border border-[#e2e8f0] dark:border-[#334155] z-10 overflow-hidden"
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[#e2e8f0] dark:border-[#334155]">
+                <div>
+                  <h2 className="text-lg font-semibold text-[#0f172a] dark:text-[#f8fafc]">QR Check-in Mandiri</h2>
+                  <p className="text-xs text-[#64748b] mt-0.5">{qrEvent.name}</p>
+                </div>
+                <button onClick={() => setQrEvent(null)} className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#94a3b8]" aria-label="Tutup">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="px-6 py-6 text-center">
+                <p className="text-sm text-[#64748b] max-w-sm mx-auto">
+                  Tampilkan atau cetak QR ini di lokasi acara. Tamu memindainya dari laman undangan mereka untuk melakukan check-in mandiri.
+                </p>
+                <div className="mt-5 min-h-[280px] flex items-center justify-center">
+                  {isLoadingQR && <Loader2 size={28} className="animate-spin text-[#4f46e5]" />}
+                  {!isLoadingQR && qrError && (
+                    <div className="text-sm text-[#e11d48]">
+                      <p>{qrError}</p>
+                      <button onClick={() => void refetchQR()} className="mt-2 text-[#4f46e5] font-semibold hover:underline">Coba lagi</button>
+                    </div>
+                  )}
+                  {!isLoadingQR && !qrError && qr?.url && (
+                    <div className="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-sm" id="event-checkin-qr-print">
+                      <QRCodeSVG code={qr.url} size={280} />
+                    </div>
+                  )}
+                </div>
+                {qr?.url && (
+                  <p className="mt-4 break-all text-[11px] text-[#94a3b8] select-all">{qr.url}</p>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-3 px-6 py-4 border-t border-[#e2e8f0] dark:border-[#334155]">
+                <button onClick={() => setQrEvent(null)} className="h-10 px-4 rounded-lg text-sm font-medium text-[#64748b] hover:bg-[#f1f5f9] transition-colors">Tutup</button>
+                <button
+                  onClick={() => window.print()}
+                  disabled={!qr?.url}
+                  className="h-10 px-4 rounded-lg border border-[#e2e8f0] text-sm font-medium text-[#334155] hover:bg-[#f8fafc] disabled:opacity-50 inline-flex items-center gap-2"
+                >
+                  <Printer size={16} /> Cetak
+                </button>
+                <button
+                  onClick={() => void downloadEventQR()}
+                  disabled={!qr?.url}
+                  className="h-10 px-4 rounded-lg bg-[#4f46e5] text-white text-sm font-medium hover:bg-[#6366f1] disabled:opacity-50 inline-flex items-center gap-2"
+                >
+                  <Download size={16} /> Unduh SVG
                 </button>
               </div>
             </motion.div>
