@@ -15,6 +15,7 @@ import {
   Palette,
   Mail,
   Loader2,
+  QrCode,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks';
@@ -66,13 +67,13 @@ interface PasswordStrength {
 interface WhatsAppIntegrationStatus {
   enabled: boolean;
   configured: boolean;
-  api_url: string;
-  account_token_set: boolean;
-  account_token_masked?: string;
-  sender_token_set: boolean;
-  sender_token_masked?: string;
-  source: 'tenant' | 'environment';
-  updated_at?: string;
+  connection?: {
+    state: string;
+    connected: boolean;
+    logged_in: boolean;
+    jid?: string;
+    error?: string;
+  };
 }
 
 function getPasswordStrength(password: string): PasswordStrength {
@@ -120,7 +121,6 @@ export default function Pengaturan() {
   // Notifikasi state
   const [notifRSVP, setNotifRSVP] = useState(true);
   const [notifCheckin, setNotifCheckin] = useState(true);
-  const [notifCampaignDone, setNotifCampaignDone] = useState(true);
   const [notifInviteFailed, setNotifInviteFailed] = useState(true);
   const [notifDailyDigest, setNotifDailyDigest] = useState(false);
   const [notifWeeklyDigest, setNotifWeeklyDigest] = useState(true);
@@ -132,14 +132,11 @@ export default function Pengaturan() {
   const [notifSound, setNotifSound] = useState(false);
   const [notifBrowser, setNotifBrowser] = useState(false);
 
-  // WhatsApp integration state. Token inputs are write-only and are cleared
-  // after save; the API returns only masked status values.
+  // WhatsApp integration state. Connection details are managed by the platform.
   const [whatsappEnabled, setWhatsappEnabled] = useState(false);
-  const [whatsappAccountToken, setWhatsappAccountToken] = useState('');
-  const [whatsappSenderToken, setWhatsappSenderToken] = useState('');
   const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppIntegrationStatus | null>(null);
-  const [showWhatsAppAccountToken, setShowWhatsAppAccountToken] = useState(false);
-  const [showWhatsAppSenderToken, setShowWhatsAppSenderToken] = useState(false);
+  const [whatsappPairing, setWhatsappPairing] = useState(false);
+  const [whatsappQR, setWhatsappQR] = useState<string | null>(null);
 
   const passwordStrength = getPasswordStrength(newPassword);
   const passwordsMatch = newPassword === confirmPassword && confirmPassword !== '';
@@ -156,17 +153,38 @@ export default function Pengaturan() {
   useEffect(() => {
     if (activeTab !== 'integrasi' || !currentTenant?.id) return;
     let mounted = true;
-    void api.get<{ data: WhatsAppIntegrationStatus }>('/integrations/whatsapp')
-      .then((response) => {
+    let firstLoad = true;
+    const loadStatus = async () => {
+      try {
+        const response = await api.get<{ data: WhatsAppIntegrationStatus }>('/integrations/whatsapp');
         if (!mounted) return;
-        setWhatsappStatus(response.data.data);
-        setWhatsappEnabled(response.data.data.enabled);
-      })
-      .catch(() => {
+        const nextStatus = response.data.data;
+        setWhatsappStatus(nextStatus);
+        if (firstLoad) {
+          setWhatsappEnabled(nextStatus.enabled);
+          firstLoad = false;
+        }
+        if (nextStatus.connection?.logged_in) {
+          setWhatsappPairing(false);
+          setWhatsappQR((current) => {
+            if (current) URL.revokeObjectURL(current);
+            return null;
+          });
+        }
+      } catch {
         if (mounted) setWhatsappStatus(null);
-      });
+      }
+    };
+    void loadStatus();
+    const interval = window.setInterval(() => void loadStatus(), 5000);
     return () => {
       mounted = false;
+      window.clearInterval(interval);
+      setWhatsappPairing(false);
+      setWhatsappQR((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
     };
   }, [activeTab, currentTenant?.id]);
 
@@ -256,18 +274,37 @@ export default function Pengaturan() {
     try {
       const response = await api.patch<{ data: WhatsAppIntegrationStatus }>('/integrations/whatsapp', {
         enabled: whatsappEnabled,
-        ...(whatsappAccountToken.trim() ? { account_token: whatsappAccountToken.trim() } : {}),
-        ...(whatsappSenderToken.trim() ? { sender_token: whatsappSenderToken.trim() } : {}),
       });
       setWhatsappStatus(response.data.data);
-      setWhatsappAccountToken('');
-      setWhatsappSenderToken('');
-      toast.success('Kredensial WhatsApp disimpan dan langsung diterapkan');
+      toast.success('Pengaturan WhatsApp disimpan dan langsung diterapkan');
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menyimpan kredensial WhatsApp');
+      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menyimpan pengaturan WhatsApp');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleStartWhatsAppPairing = async () => {
+    if (!whatsappStatus?.configured) {
+      toast.error('Aktifkan pengiriman WhatsApp terlebih dahulu');
+      return;
+    }
+    setWhatsappPairing(true);
+    try {
+      await api.post('/integrations/whatsapp/pair');
+      const response = await api.get<Blob>('/integrations/whatsapp/qr', { responseType: 'blob' });
+      const nextQR = URL.createObjectURL(response.data);
+      setWhatsappQR((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return nextQR;
+      });
+      toast.success('QR pairing siap dipindai dari WhatsApp');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menghubungkan WhatsApp');
+    } finally {
+      setWhatsappPairing(false);
     }
   };
 
@@ -759,7 +796,6 @@ export default function Pengaturan() {
                     {[
                       { label: 'RSVP Baru', desc: 'Tamu baru merespons RSVP', value: notifRSVP, onChange: setNotifRSVP },
                       { label: 'Check-in', desc: 'Tamu melakukan check-in', value: notifCheckin, onChange: setNotifCheckin },
-                      { label: 'Kampanye Selesai', desc: 'Kampanye komunikasi selesai dikirim', value: notifCampaignDone, onChange: setNotifCampaignDone },
                       { label: 'Undangan Gagal', desc: 'Gagal mengirim undangan ke tamu', value: notifInviteFailed, onChange: setNotifInviteFailed },
                       { label: 'Ringkasan Harian', desc: 'Ringkasan aktivitas harian', value: notifDailyDigest, onChange: setNotifDailyDigest },
                       { label: 'Ringkasan Mingguan', desc: 'Ringkasan aktivitas mingguan setiap Senin', value: notifWeeklyDigest, onChange: setNotifWeeklyDigest },
@@ -905,15 +941,17 @@ export default function Pengaturan() {
                   <div className="flex items-start justify-between gap-4 mb-5">
                     <div>
                       <h2 className="text-[1.125rem] font-semibold text-[#1e293b] dark:text-[#f8fafc]">WhatsApp Business</h2>
-                      <p className="text-xs text-[#64748b] mt-1">Konfigurasi Blastr untuk pengiriman undangan WhatsApp.</p>
+                      <p className="text-xs text-[#64748b] mt-1">Hubungkan WhatsApp untuk mengirim undangan kepada tamu.</p>
                     </div>
                     <span className={cn(
                       'inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium border',
-                      whatsappStatus?.configured
+                      whatsappStatus?.connection?.logged_in
                         ? 'bg-[#d1fae5] text-[#065f46] border-[#10b981]/30'
-                        : 'bg-[#fef3c7] text-[#92400e] border-[#f59e0b]/30'
+                        : whatsappStatus?.configured
+                          ? 'bg-[#fef3c7] text-[#92400e] border-[#f59e0b]/30'
+                          : 'bg-[#f1f5f9] text-[#64748b] border-[#cbd5e1]'
                     )}>
-                      {whatsappStatus?.configured ? 'Siap digunakan' : 'Belum lengkap'}
+                      {whatsappStatus?.connection?.logged_in ? 'Terhubung' : whatsappStatus?.configured ? 'Belum terhubung' : 'Belum lengkap'}
                     </span>
                   </div>
 
@@ -921,62 +959,51 @@ export default function Pengaturan() {
                     <div className="flex items-center justify-between rounded-lg bg-[#f8fafc] dark:bg-[#1e293b] p-3">
                       <div>
                         <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">Aktifkan pengiriman WhatsApp</p>
-                        <p className="text-[11px] text-[#94a3b8]">Perubahan langsung diterapkan tanpa restart container.</p>
+                      <p className="text-[11px] text-[#94a3b8]">Perubahan langsung diterapkan.</p>
                       </div>
                       <Switch checked={whatsappEnabled} onCheckedChange={setWhatsappEnabled} className="data-[state=checked]:bg-[#10b981]" />
                     </div>
 
-                    <div>
-                      <Label htmlFor="whatsapp-account-token">WHATSAPP_ACCOUNT_TOKEN</Label>
-                      <div className="relative mt-1.5">
-                        <Input
-                          id="whatsapp-account-token"
-                          type={showWhatsAppAccountToken ? 'text' : 'password'}
-                          value={whatsappAccountToken}
-                          onChange={(event) => setWhatsappAccountToken(event.target.value)}
-                          placeholder={whatsappStatus?.account_token_masked || 'Masukkan account token baru'}
-                          autoComplete="new-password"
-                          className="h-10 pr-10 font-mono text-xs"
-                        />
-                        <button
+                    <div className="rounded-lg border border-[#e2e8f0] dark:border-[#334155] p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">Status WhatsApp</p>
+                          <p className="text-[11px] text-[#64748b] mt-1">
+                            {whatsappStatus?.connection?.state === 'logged_in'
+                              ? 'WhatsApp sudah terhubung dan siap mengirim undangan.'
+                              : whatsappStatus?.connection?.state === 'connected'
+                                ? 'WhatsApp terdeteksi, tetapi belum terhubung sepenuhnya.'
+                                : whatsappStatus?.connection?.state === 'disabled'
+                                  ? 'Aktifkan pengiriman WhatsApp lalu simpan perubahan.'
+                                : whatsappStatus?.connection?.state === 'not_registered'
+                                    ? 'WhatsApp belum terhubung. Klik hubungkan untuk mulai.'
+                                : whatsappStatus?.connection?.state === 'unauthorized'
+                                  ? 'Koneksi WhatsApp belum dapat digunakan. Hubungi administrator.'
+                                : whatsappStatus?.connection?.state === 'unavailable'
+                                  ? 'Layanan WhatsApp sedang tidak tersedia.'
+                                  : 'Hubungkan WhatsApp dengan memindai kode dari aplikasi WhatsApp.'}
+                          </p>
+                        </div>
+                        <Button
                           type="button"
-                          onClick={() => setShowWhatsAppAccountToken((value) => !value)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8]"
-                          aria-label={showWhatsAppAccountToken ? 'Sembunyikan account token' : 'Tampilkan account token'}
+                          variant="outline"
+                          onClick={handleStartWhatsAppPairing}
+                          disabled={whatsappPairing || !whatsappStatus?.configured}
+                          className="border-[#c7d2fe] text-[#4338ca] hover:bg-[#eef2ff]"
                         >
-                          {showWhatsAppAccountToken ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
+                          {whatsappPairing ? <Loader2 size={16} className="animate-spin" /> : <QrCode size={16} />}
+                          {whatsappStatus?.connection?.logged_in ? 'Pair ulang' : 'Hubungkan WhatsApp'}
+                        </Button>
                       </div>
-                      <p className="text-[11px] text-[#94a3b8] mt-1">Kosongkan jika tidak ingin mengganti token yang tersimpan.</p>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="whatsapp-sender-token">WHATSAPP_SENDER_TOKEN</Label>
-                      <div className="relative mt-1.5">
-                        <Input
-                          id="whatsapp-sender-token"
-                          type={showWhatsAppSenderToken ? 'text' : 'password'}
-                          value={whatsappSenderToken}
-                          onChange={(event) => setWhatsappSenderToken(event.target.value)}
-                          placeholder={whatsappStatus?.sender_token_masked || 'Masukkan sender token baru'}
-                          autoComplete="new-password"
-                          className="h-10 pr-10 font-mono text-xs"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowWhatsAppSenderToken((value) => !value)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8]"
-                          aria-label={showWhatsAppSenderToken ? 'Sembunyikan sender token' : 'Tampilkan sender token'}
-                        >
-                          {showWhatsAppSenderToken ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
-                      <p className="text-[11px] text-[#94a3b8] mt-1">Token hanya ditampilkan saat sedang diisi dan tidak pernah dikembalikan API.</p>
-                    </div>
-
-                    <div className="rounded-lg border border-[#e2e8f0] dark:border-[#334155] p-3 text-xs text-[#64748b]">
-                      Sumber konfigurasi: <span className="font-medium text-[#1e293b] dark:text-[#f8fafc]">{whatsappStatus?.source === 'tenant' ? 'Pengaturan tenant' : 'Environment server'}</span>.
-                      {whatsappStatus?.source === 'environment' && ' Menyimpan token di sini akan membuat konfigurasi tenant ini menjadi prioritas.'}
+                      {whatsappStatus?.connection?.error && (
+                        <p className="text-[11px] text-[#dc2626] mt-3">{whatsappStatus.connection.error}</p>
+                      )}
+                      {whatsappQR && (
+                        <div className="mt-4 flex flex-col items-center gap-3 rounded-lg bg-[#f8fafc] dark:bg-[#1e293b] p-4">
+                          <img src={whatsappQR} alt="Kode penghubung WhatsApp" className="w-56 h-56 rounded-lg bg-white p-2" />
+                          <p className="text-xs text-center text-[#64748b]">Buka WhatsApp &gt; Perangkat tertaut &gt; Tautkan perangkat, lalu pindai kode ini.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
 

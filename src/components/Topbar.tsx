@@ -44,7 +44,6 @@ const breadcrumbMap: Record<string, { label: string; parent?: string }> = {
   '/check-in': { label: 'Check-in' },
   '/tempat-duduk': { label: 'Tempat Duduk' },
   '/komunikasi/template': { label: 'Template Komunikasi' },
-  '/komunikasi/kampanye': { label: 'Kampanye Komunikasi' },
   '/komunikasi/pesan': { label: 'Riwayat Pesan' },
   '/tim': { label: 'Tim' },
   '/tim-acara': { label: 'Tim Acara' },

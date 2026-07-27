@@ -221,10 +221,6 @@ export default function Plan() {
                     included={true}
                   />
                   <FeatureItem
-                    text="Broadcast via WhatsApp"
-                    included={plan.features.whatsapp_campaign}
-                  />
-                  <FeatureItem
                     text="Template Pesan Kustom"
                     included={plan.features.custom_template}
                   />

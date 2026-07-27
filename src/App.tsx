@@ -18,7 +18,6 @@ import RSVPPage from './pages/RSVP';
 import Checkin from './pages/Checkin';
 import TempatDuduk from './pages/TempatDuduk';
 import TemplateKomunikasi from './pages/TemplateKomunikasi';
-import KampanyeKomunikasi from './pages/KampanyeKomunikasi';
 import RiwayatPesan from './pages/RiwayatPesan';
 import Tim from './pages/Tim';
 import TimAcara from './pages/TimAcara';
@@ -54,7 +53,6 @@ function App() {
           <Route path="rsvp" element={<RSVPPage />} />
           <Route path="check-in" element={<Checkin />} />
           <Route path="tempat-duduk" element={<TempatDuduk />} />
-          <Route path="komunikasi/kampanye" element={<KampanyeKomunikasi />} />
           <Route path="komunikasi/pesan" element={<RiwayatPesan />} />
           <Route path="tim-acara" element={<TimAcara />} />
         </Route>

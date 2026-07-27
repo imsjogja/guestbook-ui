@@ -11,7 +11,6 @@ import {
   ScanLine,
   Armchair,
   FileText,
-  Megaphone,
   MessageSquare,
   Users2,
   ShieldCheck,
@@ -63,7 +62,6 @@ const navGroups: NavGroup[] = [
     label: 'Komunikasi',
     items: [
       { label: 'Template', path: '/komunikasi/template', icon: <FileText size={20} />, permission: 'communication:read' },
-      { label: 'Kampanye', path: '/komunikasi/kampanye', icon: <Megaphone size={20} />, permission: 'communication:read' },
       { label: 'Riwayat Pesan', path: '/komunikasi/pesan', icon: <MessageSquare size={20} />, permission: 'communication:read' },
     ],
   },
