@@ -7,8 +7,6 @@ import {
   Shield,
   Plug,
   Globe,
-  Upload,
-  Trash2,
   ChevronRight,
   Eye,
   EyeOff,
@@ -445,19 +443,10 @@ export default function Pengaturan() {
                     <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#4f46e5] to-[#6366f1] flex items-center justify-center text-white text-[1.5rem] font-semibold flex-shrink-0">
                       {user?.fullName ? getInitials(user.fullName) : user?.email?.charAt(0).toUpperCase() || 'U'}
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" className="gap-2 border-[#e2e8f0] text-[#64748b]">
-                          <Upload size={14} />
-                          Unggah Foto Baru
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-[#f43f5e] hover:text-[#e11d48] hover:bg-[#ffe4e6] gap-2">
-                          <Trash2 size={14} />
-                          Hapus Foto
-                        </Button>
+                      <div className="flex flex-col gap-2">
+                        <p className="text-[12px] text-[#64748b]">Foto profil belum tersedia.</p>
+                        <p className="text-[11px] text-[#94a3b8]">Gunakan inisial akun untuk sementara.</p>
                       </div>
-                      <p className="text-[11px] text-[#94a3b8]">JPG/PNG, maks 2MB</p>
-                    </div>
                   </div>
                 </div>
 
@@ -739,16 +728,7 @@ export default function Pengaturan() {
                             <span className="text-white font-bold text-lg">G</span>
                           </div>
                         </div>
-                        <div className="flex flex-col gap-2">
-                          <Button variant="outline" size="sm" className="gap-2 border-[#e2e8f0] text-[#64748b]">
-                            <Upload size={14} />
-                            Unggah Logo
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-[#f43f5e] hover:text-[#e11d48] hover:bg-[#ffe4e6] gap-2">
-                            <Trash2 size={14} />
-                            Hapus Logo
-                          </Button>
-                        </div>
+                        <p className="text-[12px] text-[#64748b]">Upload logo belum tersedia.</p>
                       </div>
                       <p className="text-[11px] text-[#94a3b8] mt-2">Disarankan: SVG transparan, 1:1 ratio, maks 1MB</p>
                     </div>
@@ -972,9 +952,7 @@ export default function Pengaturan() {
                           <p className="text-[11px] text-[#94a3b8]">Nonaktif</p>
                         </div>
                       </div>
-                      <Button variant="outline" size="sm" className="border-[#e2e8f0] text-[#64748b]">
-                        Aktifkan
-                      </Button>
+                      <span className="text-[11px] text-[#94a3b8]">Segera tersedia</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-[#f8fafc] dark:bg-[#1e293b] rounded-lg">
                       <div className="flex items-center gap-3">
@@ -984,9 +962,7 @@ export default function Pengaturan() {
                           <p className="text-[11px] text-[#94a3b8]">1 perangkat saat ini</p>
                         </div>
                       </div>
-                      <Button variant="outline" size="sm" className="border-[#e2e8f0] text-[#f43f5e] hover:text-[#e11d48] hover:bg-[#ffe4e6]">
-                        Kelola
-                      </Button>
+                      <span className="text-[11px] text-[#94a3b8]">Segera tersedia</span>
                     </div>
                   </div>
                 </div>
@@ -1175,7 +1151,8 @@ export default function Pengaturan() {
                   </div>
                 </div>
                 <div className="flex justify-end">
-                  <Button onClick={() => toast.success('Preferensi berhasil disimpan')} className="bg-[#4f46e5] hover:bg-[#6366f1] text-white">
+                  <Button onClick={handleSaveTenant} disabled={isSaving} className="bg-[#4f46e5] hover:bg-[#6366f1] text-white">
+                    {isSaving ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
                     Simpan Perubahan
                   </Button>
                 </div>

@@ -78,7 +78,7 @@ export function useMessages(eventId?: string): UseMessagesReturn {
     if (!silent) setIsLoading(true);
     setError(null);
     try {
-      const params = { eventId };
+      const params = { eventId, page: 1, per_page: 100 };
       const res = await api.get<{ data: BackendMessage[]; meta?: { total?: number } }>('/messages', { params });
       if (requestId !== requestIdRef.current) return;
       const normalized = (res.data.data || []).map(normalizeMessage);

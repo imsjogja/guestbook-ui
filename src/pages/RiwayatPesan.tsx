@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { downloadTextFile } from '@/lib/guest-csv';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -96,6 +97,37 @@ export default function RiwayatPesan() {
     }
   };
 
+  const handleExport = () => {
+    if (filteredMessages.length === 0) {
+      toast.info('Tidak ada pesan untuk diekspor');
+      return;
+    }
+
+    const escapeCsv = (value: string) => {
+      const escaped = value.replaceAll('"', '""');
+      return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
+    };
+    const rows = filteredMessages.map((message) => [
+      message.createdAt,
+      message.sentAt ?? '',
+      message.channel,
+      message.status,
+      message.guestId,
+      message.providerHttpStatus?.toString() ?? '',
+      message.externalId ?? '',
+      message.failedReason ?? '',
+      message.subject ?? '',
+      message.body,
+    ].map(escapeCsv).join(','));
+    const csv = [
+      'created_at,sent_at,channel,status,guest_id,provider_http_status,external_id,error,subject,body',
+      ...rows,
+    ].join('\n');
+    const date = new Date().toISOString().slice(0, 10);
+    downloadTextFile(`riwayat_pesan_${date}.csv`, `${csv}\n`, 'text/csv;charset=utf-8');
+    toast.success(`${filteredMessages.length} pesan diekspor`);
+  };
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -134,6 +166,8 @@ export default function RiwayatPesan() {
             variant="outline"
             size="sm"
             className="h-10 gap-2 border-[#e2e8f0] text-[#64748b] hover:text-[#1e293b]"
+            onClick={handleExport}
+            disabled={isLoading || filteredMessages.length === 0}
           >
             <Download size={16} />
             <span className="hidden sm:inline">Ekspor Log</span>
