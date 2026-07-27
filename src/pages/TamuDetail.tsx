@@ -400,12 +400,15 @@ export default function TamuDetail() {
     );
   }
 
-  const checkins = (guest.checkins || []).map((ci) => ({
+  const allCheckins = (guest.checkins || []).map((ci) => ({
     eventId: (ci as unknown as Record<string, unknown>).eventId as string | undefined,
     checkedInAt: ci.checkedInAt,
     seatAssignment: ci.seatAssignment,
     checkinMethod: ci.checkinMethod,
   })) as CheckinRecord[];
+  const checkins = currentEventId
+    ? allCheckins.filter((checkin) => checkin.eventId === currentEventId)
+    : [];
   const typeKey = guest.category || 'other';
   const typeLabel = typeKey.charAt(0).toUpperCase() + typeKey.slice(1);
 
@@ -875,7 +878,7 @@ export default function TamuDetail() {
                     </tr>
                   </thead>
                   <tbody>
-                    {checkins.map((ci, i) => (
+                    {allCheckins.map((ci, i) => (
                       <tr key={i} className="border-t border-[#f1f5f9] dark:border-[#334155]">
                         <td className="px-4 py-3 text-sm text-[#0f172a] dark:text-[#f8fafc]">{ci.eventId || '-'}</td>
                         <td className="px-4 py-3 text-sm text-[#64748b]">
@@ -890,7 +893,7 @@ export default function TamuDetail() {
                         </td>
                       </tr>
                     ))}
-                    {checkins.length === 0 && (
+                    {allCheckins.length === 0 && (
                       <tr>
                         <td colSpan={4} className="text-center py-8 text-sm text-[#64748b]">
                           Belum ada riwayat check-in

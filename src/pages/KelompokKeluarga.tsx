@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -15,10 +15,13 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getGuestFirstName, getGuestInitials } from '@/lib/normalizers';
+import { getGuestInitials, normalizeGuest } from '@/lib/normalizers';
+import api from '@/lib/api';
 import { useGuests, useTenantAccess } from '@/hooks';
 import type { Guest } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -37,6 +40,21 @@ interface Household {
   name: string;
   eventName: string;
   members: HouseholdMember[];
+}
+
+interface BackendHousehold {
+  id: string;
+  name: string;
+}
+
+interface BackendHouseholdMember {
+  id: string;
+  tenant_id: string;
+  full_name: string;
+  guest_type?: string | null;
+  household_id?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 /* ─── Avatar Gradients ─── */
@@ -63,11 +81,17 @@ const rsvpDot: Record<string, string> = {
   'belum': '#94a3b8',
 };
 
+function toastError(err: unknown, fallback: string) {
+  const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+  toast.error(axiosErr.response?.data?.error ?? axiosErr.response?.data?.message ?? (err instanceof Error ? err.message : fallback));
+}
+
 /* ─── Component ─── */
 export default function KelompokKeluarga() {
+  const navigate = useNavigate();
   const currentEvent = useTenantStore((state) => state.currentEvent);
   const currentEventId = currentEvent?.id;
-  const { guests, isLoading, error, refetch, createGuest } = useGuests(currentEventId);
+  const { guests, isLoading: isLoadingGuests, error: guestsError, refetch: refetchGuests } = useGuests(currentEventId, { all: true });
   const { access } = useTenantAccess();
   const canWriteGuests = access?.permissions.includes('guest:write') ?? false;
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,49 +99,59 @@ export default function KelompokKeluarga() {
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showAddMember, setShowAddMember] = useState<string | null>(null);
+  const [households, setHouseholds] = useState<Household[]>([]);
+  const [isLoadingHouseholds, setIsLoadingHouseholds] = useState(true);
+  const [householdError, setHouseholdError] = useState<string | null>(null);
 
   /* Form state */
   const [formName, setFormName] = useState('');
-  const [newMemberName, setNewMemberName] = useState('');
-  const [newMemberType, setNewMemberType] = useState('Anggota');
+  const [newMemberId, setNewMemberId] = useState('');
 
-  /* ── Derive households from guests ── */
-  const households: Household[] = useMemo(() => {
-    const groups = new Map<string, Guest[]>();
-
-    // Group guests by householdId
-    guests.forEach((g) => {
-      const hhId = g.householdId || 'ungrouped';
-      if (!groups.has(hhId)) groups.set(hhId, []);
-      groups.get(hhId)!.push(g);
-    });
-
-    // Convert to Household array
-    const result: Household[] = [];
-    groups.forEach((members, hhId) => {
-      if (hhId === 'ungrouped') {
-        // Create individual households for ungrouped guests (each their own group)
-        members.forEach((g) => {
-          result.push({
-            id: `individual-${g.id}`,
-            name: g.fullName,
-            eventName: currentEvent?.name ?? 'Acara aktif',
-            members: [mapGuestToMember(g)],
-          });
-        });
-      } else {
-        const firstMember = members[0];
-        result.push({
-          id: hhId,
-          name: firstMember.subgroup || `Keluarga ${getGuestFirstName(firstMember.fullName)}`,
+  const fetchHouseholds = async () => {
+    if (!currentEventId) {
+      setHouseholds([]);
+      setIsLoadingHouseholds(false);
+      return;
+    }
+    setIsLoadingHouseholds(true);
+    setHouseholdError(null);
+    try {
+      const response = await api.get<{ data: BackendHousehold[] }>('/households', {
+        params: { page: 1, per_page: 100 },
+      });
+      const eventGuestIds = new Set(guests.map((guest) => guest.id));
+      const loaded = await Promise.all((response.data.data ?? []).map(async (household) => {
+        const membersResponse = await api.get<{ data: BackendHouseholdMember[] }>(`/households/${household.id}/members`);
+        const members = (membersResponse.data.data ?? [])
+          .map((member) => normalizeGuest(member as never))
+          .filter((member) => eventGuestIds.has(member.id))
+          .map(mapGuestToMember);
+        return {
+          id: household.id,
+          name: household.name,
           eventName: currentEvent?.name ?? 'Acara aktif',
-          members: members.map(mapGuestToMember),
-        });
-      }
-    });
+          members,
+        } satisfies Household;
+      }));
+      setHouseholds(loaded);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+      setHouseholdError(axiosErr.response?.data?.error ?? axiosErr.response?.data?.message ?? 'Gagal memuat kelompok keluarga');
+    } finally {
+      setIsLoadingHouseholds(false);
+    }
+  };
 
-    return result;
-  }, [currentEvent?.name, guests]);
+  useEffect(() => {
+    void fetchHouseholds();
+  }, [currentEventId, guests, currentEvent?.name]);
+
+  const isLoading = isLoadingGuests || isLoadingHouseholds;
+  const error = guestsError || householdError;
+  const refetch = async () => {
+    await refetchGuests();
+    await fetchHouseholds();
+  };
 
   /* Filtered */
   const filtered = households.filter((h) =>
@@ -125,37 +159,60 @@ export default function KelompokKeluarga() {
     h.eventName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleDeleteHousehold = (_id: string) => {
-    // Since we don't have a direct household delete API, we just remove from UI state locally
-    // In a real app this would call deleteGuest for each member or a deleteHousehold API
-    setDropdownOpen(null);
+  const handleDeleteHousehold = async (id: string) => {
+    try {
+      await api.delete(`/households/${id}`);
+      await fetchHouseholds();
+      setDropdownOpen(null);
+    } catch (err: unknown) {
+      toastError(err, 'Gagal menghapus kelompok');
+    }
   };
 
-  const handleRemoveMember = (_householdId: string, _memberId: string) => {
-    // This would call updateGuest to remove householdId
-    setDropdownOpen(null);
+  const handleRemoveMember = async (householdId: string, memberId: string) => {
+    try {
+      await api.delete(`/households/${householdId}/members/${memberId}`);
+      await fetchHouseholds();
+      setDropdownOpen(null);
+    } catch (err: unknown) {
+      toastError(err, 'Gagal menghapus anggota kelompok');
+    }
   };
 
   const handleCreateHousehold = async () => {
     if (!formName.trim()) return;
     if (!canWriteGuests) return;
-    // Create a household by creating a guest with household data
-    // The household name is stored in the subgroup field
-    await createGuest({
-      fullName: formName,
-      subgroup: formName,
-      eventId: currentEventId ?? '',
-      category: 'family',
-      plusOne: false,
-    });
-    setShowCreate(false);
-    setFormName('');
+    try {
+      await api.post('/households', { name: formName.trim(), guest_ids: [] });
+      await fetchHouseholds();
+      setShowCreate(false);
+      setFormName('');
+    } catch (err: unknown) {
+      toastError(err, 'Gagal membuat kelompok');
+    }
   };
 
-  const handleAddMember = (_householdId: string) => {
-    if (!newMemberName.trim()) return;
-    setNewMemberName('');
-    setShowAddMember(null);
+  const handleAddMember = async (householdId: string) => {
+    if (!newMemberId) return;
+    try {
+      await api.post(`/households/${householdId}/members`, { guest_id: newMemberId, role: 'member' });
+      await fetchHouseholds();
+      setNewMemberId('');
+      setShowAddMember(null);
+    } catch (err: unknown) {
+      toastError(err, 'Gagal menambah anggota kelompok');
+    }
+  };
+
+  const handleRenameHousehold = async (household: Household) => {
+    const name = window.prompt('Nama kelompok', household.name)?.trim();
+    if (!name || name === household.name) return;
+    try {
+      await api.patch(`/households/${household.id}`, { name });
+      await fetchHouseholds();
+    } catch (err: unknown) {
+      toastError(err, 'Gagal mengubah nama kelompok');
+    }
   };
 
   /* ── Loading State ── */
@@ -276,7 +333,7 @@ export default function KelompokKeluarga() {
                           <motion.div initial={{ opacity: 0, scale: 0.95, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -4 }}
                             transition={{ duration: 0.15, ease: easeOutExpo }}
                             className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#151c2c] border border-[#e2e8f0] dark:border-[#334155] rounded-lg shadow-lg z-20 py-1">
-                            <button onClick={() => { setDropdownOpen(null); }}
+                            <button onClick={() => { setDropdownOpen(null); void handleRenameHousehold(hh); }}
                               className="w-full text-left px-3 py-2 text-sm text-[#64748b] hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors flex items-center gap-2">
                               <Pencil size={13} /> Ubah
                             </button>
@@ -382,7 +439,7 @@ export default function KelompokKeluarga() {
                     <Plus size={13} />
                     Tambah Anggota
                   </button>
-                  <button className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-[#64748b] hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] transition-colors">
+                  <button onClick={() => navigate('/undangan')} className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium text-[#64748b] hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] transition-colors">
                     <Send size={13} />
                     Kirim Undangan
                   </button>
@@ -400,33 +457,25 @@ export default function KelompokKeluarga() {
                     >
                       <div className="pt-3 mt-3 border-t border-[#e2e8f0] dark:border-[#334155] space-y-2">
                         <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={newMemberName}
-                            onChange={(e) => setNewMemberName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddMember(hh.id)}
-                            placeholder="Nama anggota..."
+                          <select
+                            value={newMemberId}
+                            onChange={(e) => setNewMemberId(e.target.value)}
                             autoFocus
                             className="flex-1 h-9 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20"
-                          />
-                          <select
-                            value={newMemberType}
-                            onChange={(e) => setNewMemberType(e.target.value)}
-                            className="h-9 px-2 rounded-lg border border-[#e2e8f0] bg-white text-xs focus:outline-none focus:border-[#4f46e5]"
                           >
-                            <option value="Anggota">Anggota</option>
-                            <option value="Anak">Anak</option>
-                            <option value="Saudara">Saudara</option>
-                            <option value="Keponakan">Keponakan</option>
+                            <option value="">Pilih tamu dari acara aktif</option>
+                            {guests.filter((guest) => !hh.members.some((member) => member.id === guest.id)).map((guest) => (
+                              <option key={guest.id} value={guest.id}>{guest.fullName}</option>
+                            ))}
                           </select>
                         </div>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => handleAddMember(hh.id)}
-                            disabled={!newMemberName.trim()}
+                            onClick={() => void handleAddMember(hh.id)}
+                            disabled={!newMemberId}
                             className={cn(
                               'h-8 px-3 rounded-lg text-xs font-medium transition-all',
-                              !newMemberName.trim()
+                              !newMemberId
                                 ? 'bg-[#e2e8f0] text-[#94a3b8] cursor-not-allowed'
                                 : 'bg-[#4f46e5] text-white hover:bg-[#6366f1]'
                             )}
@@ -434,7 +483,7 @@ export default function KelompokKeluarga() {
                             Tambah
                           </button>
                           <button
-                            onClick={() => { setShowAddMember(null); setNewMemberName(''); }}
+                            onClick={() => { setShowAddMember(null); setNewMemberId(''); }}
                             className="h-8 px-3 rounded-lg text-xs font-medium text-[#64748b] hover:bg-[#f1f5f9] transition-colors"
                           >
                             Batal

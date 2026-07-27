@@ -91,7 +91,7 @@ function getPasswordStrength(password: string): PasswordStrength {
 export default function Pengaturan() {
   const { user, logout } = useAuth();
   const setUser = useAuthStore((state) => state.setUser);
-  const { currentTenant } = useTenantStore();
+  const { currentTenant, setTenant } = useTenantStore();
   const [activeTab, setActiveTab] = useState<TabKey>('profil');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -149,6 +149,31 @@ export default function Pengaturan() {
     setProfilePosition(user.position || '');
     setProfileBio(user.bio || '');
   }, [user]);
+
+  useEffect(() => {
+    if (!currentTenant) return;
+    const settings = (currentTenant.settings ?? {}) as unknown as Record<string, unknown>;
+    const notification = (settings.notification_preferences ?? {}) as Record<string, unknown>;
+    setTenantName(currentTenant.name || '');
+    setTenantTimezone(typeof settings.timezone === 'string' ? settings.timezone : 'Asia/Jakarta');
+    setTenantDateFormat(typeof settings.date_format === 'string' ? settings.date_format : '15 Januari 2025');
+    setTenantIndustry(typeof settings.industry === 'string' ? settings.industry : 'Pernikahan');
+    setPrimaryColor(currentTenant.primaryColor || '#4f46e5');
+    setEmailFromName(typeof settings.email_from_name === 'string' ? settings.email_from_name : `GuestFlow - ${currentTenant.name}`);
+    setEmailSignature(typeof settings.email_signature === 'string' ? settings.email_signature : 'Salam,\n[{{nama_tenant}}]\n---\nDikirim via GuestFlow');
+    setNotifRSVP(notification.email_rsvp !== false);
+    setNotifCheckin(notification.email_checkin !== false);
+    setNotifInviteFailed(notification.email_invite_failed !== false);
+    setNotifDailyDigest(notification.email_daily_digest === true);
+    setNotifWeeklyDigest(notification.email_weekly_digest !== false);
+    setNotifTeamActivity(notification.email_team_activity === true);
+    setNotifWAUrgent(notification.whatsapp_urgent !== false);
+    setNotifWADaily(notification.whatsapp_daily === true);
+    setNotifWAOTP(notification.whatsapp_otp !== false);
+    setNotifInApp(notification.in_app !== false);
+    setNotifSound(notification.sound === true);
+    setNotifBrowser(notification.browser === true);
+  }, [currentTenant]);
 
   useEffect(() => {
     if (activeTab !== 'integrasi' || !currentTenant?.id) return;
@@ -246,24 +271,65 @@ export default function Pengaturan() {
   };
 
   const handleSaveTenant = async () => {
+    if (!currentTenant?.id) {
+      toast.error('Tenant aktif belum dipilih');
+      return;
+    }
     setIsSaving(true);
     try {
-      // await api.patch('/tenants/me', { name: tenantName, settings: { timezone: tenantTimezone, ... } });
+      const response = await api.patch<{ data: NonNullable<typeof currentTenant> }>(`/tenants/${currentTenant.id}`, {
+        name: tenantName.trim(),
+        primary_color: primaryColor,
+        settings: {
+          ...(currentTenant.settings ?? {}),
+          timezone: tenantTimezone,
+          date_format: tenantDateFormat,
+          industry: tenantIndustry,
+          email_from_name: emailFromName,
+          email_signature: emailSignature,
+        },
+      });
+      setTenant(response.data.data);
       toast.success('Pengaturan tenant berhasil disimpan');
-    } catch {
-      toast.error('Gagal menyimpan pengaturan tenant');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menyimpan pengaturan tenant');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSaveNotif = async () => {
+    if (!currentTenant?.id) {
+      toast.error('Tenant aktif belum dipilih');
+      return;
+    }
     setIsSaving(true);
     try {
-      // await api.patch('/users/me/notifications', { ... });
+      const response = await api.patch<{ data: NonNullable<typeof currentTenant> }>(`/tenants/${currentTenant.id}`, {
+        settings: {
+          ...(currentTenant.settings ?? {}),
+          notification_preferences: {
+            email_rsvp: notifRSVP,
+            email_checkin: notifCheckin,
+            email_invite_failed: notifInviteFailed,
+            email_daily_digest: notifDailyDigest,
+            email_weekly_digest: notifWeeklyDigest,
+            email_team_activity: notifTeamActivity,
+            whatsapp_urgent: notifWAUrgent,
+            whatsapp_daily: notifWADaily,
+            whatsapp_otp: notifWAOTP,
+            in_app: notifInApp,
+            sound: notifSound,
+            browser: notifBrowser,
+          },
+        },
+      });
+      setTenant(response.data.data);
       toast.success('Preferensi notifikasi berhasil disimpan');
-    } catch {
-      toast.error('Gagal menyimpan preferensi notifikasi');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menyimpan preferensi notifikasi');
     } finally {
       setIsSaving(false);
     }

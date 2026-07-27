@@ -125,10 +125,10 @@ const statusConfig: Record<
 
 export default function Undangan() {
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
-  const { invitations, isLoading, error, refetch, refresh, batchCreate, revokeInvitation, resendInvitation } = useInvitations(currentEventId);
+  const { invitations, isLoading, error, refetch, refresh, batchCreate, revokeInvitation } = useInvitations(currentEventId);
   const { guests: rosterGuests } = useGuests(currentEventId);
   const { templates } = useTemplates();
-  const { sendWhatsApp, isSending: isSendingWhatsApp } = useWhatsAppMessaging();
+  const { sendMessage, sendWhatsApp, isSending: isSendingWhatsApp } = useWhatsAppMessaging();
   const [search, setSearch] = useState('');
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -176,6 +176,10 @@ export default function Undangan() {
   );
   const whatsappTemplates = useMemo(
     () => templates.filter((template) => template.channel === 'whatsapp' && template.isActive),
+    [templates]
+  );
+  const emailTemplates = useMemo(
+    () => templates.filter((template) => template.channel === 'email' && template.isActive),
     [templates]
   );
   const guestById = useMemo(() => new Map(rosterGuests.map((guest) => [guest.id, guest])), [rosterGuests]);
@@ -258,9 +262,36 @@ export default function Undangan() {
   };
 
   const handleResend = async (inv: UIInvitation) => {
-    const success = await resendInvitation(inv.id);
-    if (!success) {
-      toast.info('Kirim ulang undangan belum tersedia');
+    const templateList = inv.channel === 'email' ? emailTemplates : whatsappTemplates;
+    const templateId = templateList[0]?.id;
+    if (!templateId) {
+      toast.error(`Template ${inv.channel === 'email' ? 'Email' : 'WhatsApp'} aktif belum tersedia`);
+      return;
+    }
+    const guest = guestById.get(inv.guestId);
+    if (!guest) {
+      toast.error('Data tamu tidak ditemukan pada acara aktif');
+      return;
+    }
+    if (inv.channel === 'email' && !guest.email?.trim()) {
+      toast.error('Alamat email tamu belum diisi');
+      return;
+    }
+    if (inv.channel !== 'email' && !guest.phone?.trim()) {
+      toast.error('Nomor WhatsApp tamu belum diisi');
+      return;
+    }
+    try {
+      const result = await sendMessage({ guest_ids: [inv.guestId], template_id: templateId });
+      await refresh();
+      const failedCount = countFailedMessages(result);
+      if (failedCount > 0) {
+        toast.error('Kirim ulang undangan gagal');
+      } else {
+        toast.success('Undangan dikirim ulang');
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Gagal mengirim ulang undangan');
     }
   };
 
@@ -283,25 +314,35 @@ export default function Undangan() {
         toast.error(`Nomor WhatsApp belum diisi untuk ${missing.length} tamu`);
         return;
       }
+    } else {
+      if (!batchTemplateId) {
+        toast.error('Belum ada template Email aktif');
+        return;
+      }
+      const missing = batchCandidates.filter((guest) => batchGuests.includes(guest.id) && !guest.email?.trim());
+      if (missing.length > 0) {
+        toast.error(`Email belum diisi untuk ${missing.length} tamu`);
+        return;
+      }
     }
     const created = await batchCreate(batchGuests, batchChannel, batchTemplateId);
     if (created.length === 0) return;
-    if (batchChannel === 'whatsapp') {
+    if (batchChannel === 'whatsapp' || batchChannel === 'email') {
       try {
-        const result = await sendWhatsApp({
+        const result = await sendMessage({
           guest_ids: created.map((invitation) => invitation.guestId),
           template_id: batchTemplateId,
         });
         await refresh();
         const failedCount = countFailedMessages(result);
         if (failedCount > 0) {
-          toast.error(`${failedCount} WhatsApp gagal dikirim; status tabel sudah diperbarui`);
+          toast.error(`${failedCount} ${batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'} gagal dikirim; status tabel sudah diperbarui`);
         } else {
-          toast.success(`${created.length} WhatsApp berhasil dikirim`);
+          toast.success(`${created.length} ${batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'} berhasil dikirim`);
         }
       } catch (err: unknown) {
         await refresh();
-        toast.error(err instanceof Error ? err.message : 'Gagal mengirim WhatsApp');
+        toast.error(err instanceof Error ? err.message : `Gagal mengirim ${batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'}`);
       }
     } else {
       toast.success(`${created.length} undangan berhasil dibuat`);
@@ -647,7 +688,6 @@ export default function Undangan() {
                           {inv.status === 'failed' && (
                             <button
                               onClick={() => handleResend(inv)}
-                              disabled
                               className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors"
                               title="Kirim Ulang"
                             >
@@ -786,7 +826,7 @@ export default function Undangan() {
               <Download size={14} />
               Unduh QR
             </Button>
-            <Button size="sm" disabled onClick={() => qrInvitation && handleResend(qrInvitation)}>
+            <Button size="sm" onClick={() => qrInvitation && void handleResend(qrInvitation)}>
               <Send size={14} />
               Kirim Ulang
             </Button>
@@ -857,7 +897,10 @@ export default function Undangan() {
                   ].map((ch) => (
                     <button
                       key={ch.value}
-                      onClick={() => setBatchChannel(ch.value)}
+                      onClick={() => {
+                        setBatchChannel(ch.value);
+                        setBatchTemplateId((ch.value === 'whatsapp' ? whatsappTemplates : emailTemplates)[0]?.id || '');
+                      }}
                       className={cn(
                         'flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors',
                         batchChannel === ch.value
@@ -880,13 +923,13 @@ export default function Undangan() {
                     <SelectValue placeholder="Pilih template WhatsApp" />
                   </SelectTrigger>
                   <SelectContent>
-                    {whatsappTemplates.map((template) => (
+                    {(batchChannel === 'whatsapp' ? whatsappTemplates : emailTemplates).map((template) => (
                       <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {whatsappTemplates.length === 0 && (
-                  <p className="text-xs text-[#b45309]">Belum ada template WhatsApp aktif.</p>
+                {(batchChannel === 'whatsapp' ? whatsappTemplates : emailTemplates).length === 0 && (
+                  <p className="text-xs text-[#b45309]">Belum ada template {batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'} aktif.</p>
                 )}
               </div>
             </div>

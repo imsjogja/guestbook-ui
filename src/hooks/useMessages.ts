@@ -55,6 +55,7 @@ export interface UseMessagesReturn {
   isLoading: boolean;
   error: string | null;
   refetch: () => void;
+  retryMessage: (messageId: string) => Promise<Message>;
 }
 
 export function useMessages(eventId?: string): UseMessagesReturn {
@@ -64,7 +65,7 @@ export function useMessages(eventId?: string): UseMessagesReturn {
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
 
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async (silent = false) => {
     if (!eventId) {
       setMessages([]);
       setTotal(0);
@@ -74,7 +75,7 @@ export function useMessages(eventId?: string): UseMessagesReturn {
     }
 
     const requestId = ++requestIdRef.current;
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
     setError(null);
     try {
       const params = { eventId };
@@ -88,7 +89,7 @@ export function useMessages(eventId?: string): UseMessagesReturn {
       const msg = err instanceof Error ? err.message : 'Gagal memuat pesan';
       setError(msg);
     } finally {
-      if (requestId === requestIdRef.current) setIsLoading(false);
+      if (requestId === requestIdRef.current && !silent) setIsLoading(false);
     }
   }, [eventId]);
 
@@ -102,7 +103,24 @@ export function useMessages(eventId?: string): UseMessagesReturn {
       return;
     }
     void fetchMessages();
+    const interval = window.setInterval(() => {
+      void fetchMessages(true);
+    }, 5000);
+    return () => window.clearInterval(interval);
   }, [eventId, fetchMessages]);
 
-  return { messages, total, isLoading, error, refetch: fetchMessages };
+  const retryMessage = useCallback(async (messageId: string) => {
+    if (!eventId) throw new Error('Event aktif belum dipilih');
+    try {
+      const response = await api.post<{ data: BackendMessage }>(`/messages/${messageId}/retry`);
+      const retried = normalizeMessage(response.data.data);
+      await fetchMessages(true);
+      return retried;
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+      throw new Error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal mengirim ulang pesan');
+    }
+  }, [eventId, fetchMessages]);
+
+  return { messages, total, isLoading, error, refetch: fetchMessages, retryMessage };
 }

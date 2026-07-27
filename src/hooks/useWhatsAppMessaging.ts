@@ -18,7 +18,7 @@ function getErrorMessage(error: unknown): string {
 export function useWhatsAppMessaging() {
   const [isSending, setIsSending] = useState(false);
 
-  const sendWhatsApp = useCallback(async (payload: SendWhatsAppPayload) => {
+  const sendMessage = useCallback(async (payload: SendWhatsAppPayload) => {
     if (payload.guest_ids.length === 0) {
       throw new Error('Pilih minimal satu tamu');
     }
@@ -37,5 +37,7 @@ export function useWhatsAppMessaging() {
     }
   }, []);
 
-  return { sendWhatsApp, isSending };
+  const sendWhatsApp = useCallback((payload: SendWhatsAppPayload) => sendMessage(payload), [sendMessage]);
+
+  return { sendMessage, sendWhatsApp, isSending };
 }

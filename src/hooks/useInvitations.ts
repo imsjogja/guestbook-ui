@@ -49,7 +49,6 @@ export interface UseInvitationsReturn {
   createInvitation: (data: Partial<Invitation> & { guestId?: string; guestIds?: string[]; expiresAt?: string }) => Promise<Invitation | null>;
   batchCreate: (guestIds: string[], channel: string, templateId?: string) => Promise<Invitation[]>;
   revokeInvitation: (id: string) => Promise<boolean>;
-  resendInvitation: (id: string) => Promise<boolean>;
 }
 
 function normalizeInvitationResponse(invitation: BackendInvitation): Invitation {
@@ -175,10 +174,6 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
     }
   }, [eventId]);
 
-  const resendInvitation = useCallback(async (_id: string): Promise<boolean> => {
-    return false;
-  }, []);
-
   return {
     invitations,
     isLoading,
@@ -188,6 +183,5 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
     createInvitation,
     batchCreate,
     revokeInvitation,
-    resendInvitation,
   };
 }

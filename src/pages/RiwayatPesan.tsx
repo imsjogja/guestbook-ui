@@ -52,7 +52,7 @@ const statusConfig: Record<MessageStatus, { label: string; color: string; bgColo
 export default function RiwayatPesan() {
   const currentEvent = useTenantStore((state) => state.currentEvent);
   const currentEventId = currentEvent?.id;
-  const { messages, isLoading, error, refetch } = useMessages(currentEventId);
+  const { messages, isLoading, error, refetch, retryMessage } = useMessages(currentEventId);
   const [searchQuery, setSearchQuery] = useState('');
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -87,8 +87,13 @@ export default function RiwayatPesan() {
     setIsDetailOpen(true);
   };
 
-  const handleRetry = (_id: string) => {
-    toast.success('Pesan dikirim ulang');
+  const handleRetry = async (id: string) => {
+    try {
+      const retried = await retryMessage(id);
+      toast.success(retried.status === 'failed' ? 'Pengiriman ulang gagal' : 'Pesan dikirim ulang');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Gagal mengirim ulang pesan');
+    }
   };
 
   if (error) {
@@ -285,7 +290,7 @@ export default function RiwayatPesan() {
                           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                             {msg.status === 'failed' && (
                               <button
-                                onClick={() => handleRetry(msg.id)}
+                                onClick={() => void handleRetry(msg.id)}
                                 className="p-1.5 rounded-md text-[#64748b] hover:text-[#4f46e5] hover:bg-[#eef2ff] transition-colors"
                                 title="Kirim Ulang"
                               >
@@ -470,7 +475,7 @@ export default function RiwayatPesan() {
                 <div className="flex gap-3 pt-2">
                   {selectedMessage.status === 'failed' && (
                     <Button
-                      onClick={() => { handleRetry(selectedMessage.id); setIsDetailOpen(false); }}
+                      onClick={() => { void handleRetry(selectedMessage.id); setIsDetailOpen(false); }}
                       className="flex-1 bg-[#4f46e5] hover:bg-[#6366f1] text-white gap-2"
                     >
                       <RotateCcw size={14} />

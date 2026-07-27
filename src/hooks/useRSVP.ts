@@ -20,6 +20,7 @@ interface ApiRSVP {
   createdAt?: string;
   updated_at?: string;
   updatedAt?: string;
+  virtual?: boolean;
 }
 
 interface ApiRSVPBreakdown {
@@ -65,6 +66,7 @@ function normalizeRSVP(item: ApiRSVP): RSVP {
     respondedVia: item.responded_via ?? item.respondedVia ?? 'manual',
     createdAt: item.created_at ?? item.createdAt ?? new Date().toISOString(),
     updatedAt: item.updated_at ?? item.updatedAt ?? new Date().toISOString(),
+    isVirtual: item.virtual === true,
   };
 }
 

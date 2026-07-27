@@ -90,7 +90,7 @@ const CHART_COLORS = {
 
 export default function RSVPPage() {
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
-  const { rsvps, breakdown, isLoading, error, refetch, updateRSVP } = useRSVP(currentEventId);
+  const { rsvps, breakdown, isLoading, error, refetch, updateRSVP, saveRSVPForGuest } = useRSVP(currentEventId);
   const { templates, isLoading: templatesLoading } = useTemplates();
   const {
     candidates,
@@ -176,10 +176,15 @@ export default function RSVPPage() {
   /* ── Handlers ───────────────────────────────────── */
 
   const handleStatusChange = async (rsvp: import('@/types').RSVP, newStatus: RSVPStatus) => {
-    await updateRSVP(rsvp.id, {
+    const data = {
       status: newStatus,
       guestCount: newStatus === 'not_attending' ? 0 : Math.max(1, rsvp.guestCount || 1),
-    });
+    };
+    if (rsvp.isVirtual) {
+      await saveRSVPForGuest(rsvp.guestId, data);
+    } else {
+      await updateRSVP(rsvp.id, data);
+    }
     setEditingId(null);
   };
 

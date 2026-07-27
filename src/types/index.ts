@@ -147,6 +147,7 @@ export interface RSVP {
   respondedVia: 'web' | 'whatsapp' | 'email' | 'manual';
   createdAt: string;
   updatedAt: string;
+  isVirtual?: boolean;
 }
 
 export interface RSVPBreakdown {
