@@ -25,7 +25,7 @@ import { useEvents } from '@/hooks/useEvents';
 import type { Event } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
 import { QRCodeSVG, downloadQRCodeSvg } from '@/components/QRCodeSVG';
-import { useEventCheckinQR } from '@/hooks';
+import { useEventCheckinQR, useTenantAccess } from '@/hooks';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -69,6 +69,9 @@ export default function Acara() {
   const currentEvent = useTenantStore((state) => state.currentEvent);
   const setCurrentEvent = useTenantStore((state) => state.setCurrentEvent);
   const { events, isLoading, error, createEvent, updateEvent, deleteEvent, refreshSilently } = useEvents();
+  const { access, isLoading: isLoadingAccess } = useTenantAccess();
+  const canWriteEvents = access?.permissions.includes('event:write') ?? false;
+  const canDeleteEvents = access?.permissions.includes('event:delete') ?? false;
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('newest');
@@ -131,6 +134,10 @@ export default function Acara() {
 
   /* ─── Handlers ─── */
   const openCreate = () => {
+    if (!canWriteEvents) {
+      setErrorToast('Role Anda hanya dapat melihat acara. Minta Tenant Owner atau Event Manager untuk membuat acara.');
+      return;
+    }
     setFormName('');
     setFormType('wedding');
     setFormDate('');
@@ -141,6 +148,10 @@ export default function Acara() {
   };
 
   const openEdit = (evt: Event) => {
+    if (!canWriteEvents) {
+      setErrorToast('Role Anda tidak memiliki akses untuk mengubah acara.');
+      return;
+    }
     setEditingEvent(evt);
     setFormName(evt.name);
     setFormType(evt.eventType);
@@ -153,6 +164,10 @@ export default function Acara() {
   };
 
   const openDelete = (evt: Event) => {
+    if (!canDeleteEvents) {
+      setErrorToast('Role Anda tidak memiliki akses untuk menghapus acara.');
+      return;
+    }
     setDeletingEvent(evt);
     setShowDelete(true);
     setDropdownOpen(null);
@@ -235,6 +250,10 @@ export default function Acara() {
   };
 
   const handleDuplicate = async (evt: Event) => {
+    if (!canWriteEvents) {
+      setErrorToast('Role Anda tidak memiliki akses untuk menduplikat acara.');
+      return;
+    }
     setErrorToast(null);
     try {
       await createEvent({
@@ -362,15 +381,20 @@ export default function Acara() {
         <div>
           <h1 className="text-2xl font-bold text-[#0f172a] dark:text-[#f8fafc]">Daftar Acara</h1>
           <p className="text-sm text-[#64748b] mt-0.5">Kelola semua acara dan detailnya</p>
+          {!isLoadingAccess && !canWriteEvents && (
+            <p className="text-xs text-[#b45309] mt-2">Mode baca: pembuatan dan perubahan acara hanya tersedia untuk Tenant Owner atau Event Manager.</p>
+          )}
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-[#4f46e5] text-white text-sm font-medium hover:bg-[#6366f1] hover:scale-[1.02] active:scale-[0.96] transition-all"
-          >
-            <Plus size={18} />
-            Buat Acara
-          </button>
+          {canWriteEvents && (
+            <button
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-[#4f46e5] text-white text-sm font-medium hover:bg-[#6366f1] hover:scale-[1.02] active:scale-[0.96] transition-all"
+            >
+              <Plus size={18} />
+              Buat Acara
+            </button>
+          )}
           <button className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-[#e2e8f0] bg-white text-[#1e293b] text-sm font-medium hover:bg-[#f1f5f9] transition-colors">
             <Download size={16} />
             Ekspor
@@ -549,13 +573,15 @@ export default function Acara() {
                                 <Check size={14} />
                                 <span className="hidden xl:inline">{currentEvent?.id === evt.id ? 'Terpilih' : 'Pilih konteks'}</span>
                               </button>
-                              <button
-                                onClick={() => openEdit(evt)}
-                                className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors"
-                                title="Ubah"
-                              >
-                                <Pencil size={15} />
-                              </button>
+                              {canWriteEvents && (
+                                <button
+                                  onClick={() => openEdit(evt)}
+                                  className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors"
+                                  title="Ubah"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                              )}
                               <button
                                 onClick={() => openEventGuests(evt)}
                                 className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors"
@@ -595,19 +621,23 @@ export default function Acara() {
                                         >
                                           Lihat Detail
                                         </button>
-                                        <button
-                                          onClick={() => handleDuplicate(evt)}
-                                          className="w-full text-left px-3 py-2 text-sm text-[#64748b] hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors"
-                                        >
-                                          Duplikat
-                                        </button>
+                                        {canWriteEvents && (
+                                          <button
+                                            onClick={() => handleDuplicate(evt)}
+                                            className="w-full text-left px-3 py-2 text-sm text-[#64748b] hover:bg-[#f8fafc] dark:hover:bg-[#1e293b] transition-colors"
+                                          >
+                                            Duplikat
+                                          </button>
+                                        )}
                                         <div className="border-t border-[#e2e8f0] dark:border-[#334155] my-1" />
-                                        <button
-                                          onClick={() => openDelete(evt)}
-                                          className="w-full text-left px-3 py-2 text-sm text-[#f43f5e] hover:bg-[#ffe4e6]/50 transition-colors"
-                                        >
-                                          Hapus
-                                        </button>
+                                        {canDeleteEvents && (
+                                          <button
+                                            onClick={() => openDelete(evt)}
+                                            className="w-full text-left px-3 py-2 text-sm text-[#f43f5e] hover:bg-[#ffe4e6]/50 transition-colors"
+                                          >
+                                            Hapus
+                                          </button>
+                                        )}
                                       </motion.div>
                                     </>
                                   )}
