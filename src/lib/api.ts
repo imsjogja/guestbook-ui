@@ -130,6 +130,10 @@ function resolveWorkspacePath(url: string, method?: string, data?: unknown) {
     return { url: `${eventPrefix}${rosterPath}${query}`, method };
   }
 
+  if (pathname === '/households' || pathname.startsWith('/households/')) {
+    return { url: `${tenantPrefix}${pathname}${query}`, method };
+  }
+
   if (pathname === '/gifts' || pathname.startsWith('/gifts/')) {
     if (!eventPrefix) return { url, method };
     return { url: `${eventPrefix}${pathname}${query}`, method };
