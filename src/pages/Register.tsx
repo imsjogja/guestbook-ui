@@ -85,38 +85,46 @@ export default function Register() {
 
   return (
     <div className="min-h-[100dvh] flex bg-[#f8fafc] dark:bg-[#0b0f19]">
-      {/* Left panel - decorative (desktop only) */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center">
-        <div className="absolute inset-0 bg-[#f8fafc]" />
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-20 left-20 w-72 h-72 rounded-full bg-[#4f46e5]/5 blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-96 h-96 rounded-full bg-[#10b981]/5 blur-3xl" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-[#6366f1]/5 blur-2xl" />
-        </div>
-        <div className="relative z-10 max-w-md px-8">
+      {/* Left panel - video hero (desktop only) */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-end bg-[#0f172a]">
+        <video
+          className="absolute inset-0 h-full w-full object-cover"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          aria-hidden="true"
+        >
+          <source src="/guestflow-login-hero.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-gradient-to-br from-[#020617]/80 via-[#0f172a]/25 to-[#4f46e5]/65" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#020617]/85 via-transparent to-transparent" />
+        <div className="relative z-10 max-w-xl px-10 pb-12 xl:px-14 xl:pb-16">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4, ease: easeOutExpo }}
           >
-            <div className="w-16 h-16 rounded-2xl bg-[#4f46e5] flex items-center justify-center mb-8 shadow-lg">
+            <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center mb-8 shadow-lg">
               <span className="text-white font-bold text-2xl">G</span>
             </div>
-            <h2 className="text-2xl font-bold text-[#0f172a] dark:text-[#f8fafc] mb-4 leading-snug">
-              Mulai kelola acara Anda dengan GuestFlow.
+            <h2 className="text-3xl xl:text-4xl font-bold text-white mb-4 leading-tight">
+              Mulai kelola acara Anda dengan alur yang lebih rapi.
             </h2>
-            <p className="text-[#64748b] leading-relaxed">
-              Daftar gratis dan mulai kelola tamu, undangan, RSVP, dan check-in untuk acara Anda dalam hitungan menit.
+            <p className="text-white/75 leading-relaxed max-w-lg">
+              Daftar sebagai Tenant Owner, verifikasi email, lalu siapkan acara,
+              tamu, undangan, RSVP, dan check-in dalam satu workspace.
             </p>
             <div className="mt-8 grid grid-cols-3 gap-4">
               {[
-                { label: 'Tamu', value: '∞' },
-                { label: 'Event', value: '∞' },
-                { label: 'Dukungan', value: '24/7' },
+                { label: 'Trial', value: '14 hari' },
+                { label: 'Role', value: 'Owner' },
+                { label: 'Email', value: 'Wajib' },
               ].map((stat) => (
                 <div key={stat.label} className="text-center">
-                  <p className="text-xl font-bold text-[#4f46e5]">{stat.value}</p>
-                  <p className="text-xs text-[#64748b]">{stat.label}</p>
+                  <p className="text-lg font-bold text-white">{stat.value}</p>
+                  <p className="text-xs text-white/65">{stat.label}</p>
                 </div>
               ))}
             </div>
