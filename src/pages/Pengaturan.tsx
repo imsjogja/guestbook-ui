@@ -16,6 +16,7 @@ import {
   QrCode,
   MessageCircle,
   CheckCircle2,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks';
@@ -85,6 +86,12 @@ interface PasswordStrength {
   color: string;
 }
 
+function formatWhatsAppNumber(status: WhatsAppIntegrationStatus | null): string {
+  const raw = status?.connection?.phone_number || status?.connection?.jid || '';
+  if (!raw) return '-';
+  return raw.replace(/@.*$/, '').replace(/:.*$/, '');
+}
+
 function getPasswordStrength(password: string): PasswordStrength {
   if (!password) return { score: 0, label: '', color: 'bg-[#e2e8f0]' };
   let score = 0;
@@ -151,6 +158,7 @@ export default function Pengaturan() {
   const [whatsappTestMessage, setWhatsappTestMessage] = useState('Tes koneksi WhatsApp GuestFlow.');
   const [whatsappTestSending, setWhatsappTestSending] = useState(false);
   const [whatsappTestResult, setWhatsappTestResult] = useState<{ to: string; sent_at?: string } | null>(null);
+  const [whatsappLoggingOut, setWhatsappLoggingOut] = useState(false);
 
   const passwordStrength = getPasswordStrength(newPassword);
   const passwordsMatch = newPassword === confirmPassword && confirmPassword !== '';
@@ -419,6 +427,25 @@ export default function Pengaturan() {
       toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Pesan uji gagal dikirim');
     } finally {
       setWhatsappTestSending(false);
+    }
+  };
+
+  const handleLogoutWhatsApp = async () => {
+    setWhatsappLoggingOut(true);
+    try {
+      const response = await api.post<{ data: WhatsAppIntegrationStatus }>('/integrations/whatsapp/logout');
+      setWhatsappStatus(response.data.data);
+      setWhatsappTestResult(null);
+      setWhatsappQR((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+      toast.success('Perangkat WhatsApp berhasil logout');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal logout perangkat WhatsApp');
+    } finally {
+      setWhatsappLoggingOut(false);
     }
   };
 
@@ -1069,17 +1096,43 @@ export default function Pengaturan() {
                             {whatsappReadiness.message}
                           </p>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleStartWhatsAppPairing}
-                          disabled={whatsappPairing || !whatsappStatus?.enabled || !whatsappStatus?.configured}
-                          className="border-[#c7d2fe] text-[#4338ca] hover:bg-[#eef2ff]"
-                        >
-                          {whatsappPairing ? <Loader2 size={16} className="animate-spin" /> : <QrCode size={16} />}
-                          {whatsappStatus?.connection?.logged_in ? 'Pair ulang' : 'Hubungkan WhatsApp'}
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleStartWhatsAppPairing}
+                            disabled={whatsappPairing || whatsappLoggingOut || !whatsappStatus?.enabled || !whatsappStatus?.configured}
+                            className="border-[#c7d2fe] text-[#4338ca] hover:bg-[#eef2ff]"
+                          >
+                            {whatsappPairing ? <Loader2 size={16} className="animate-spin" /> : <QrCode size={16} />}
+                            {whatsappStatus?.connection?.logged_in ? 'Pair ulang' : 'Hubungkan WhatsApp'}
+                          </Button>
+                          {whatsappStatus?.connection?.logged_in && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handleLogoutWhatsApp}
+                              disabled={whatsappLoggingOut}
+                              className="border-[#fecaca] text-[#b91c1c] hover:bg-[#fef2f2]"
+                            >
+                              {whatsappLoggingOut ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
+                              Logout perangkat
+                            </Button>
+                          )}
+                        </div>
                       </div>
+                      {whatsappStatus?.connection?.logged_in && (
+                        <div className="mt-4 grid gap-3 rounded-lg bg-[#f8fafc] p-3 dark:bg-[#1e293b] sm:grid-cols-2">
+                          <div>
+                            <p className="text-[11px] text-[#94a3b8]">Nomor WhatsApp terhubung</p>
+                            <p className="mt-1 text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">+{formatWhatsAppNumber(whatsappStatus)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-[#94a3b8]">Device ID</p>
+                            <p className="mt-1 break-all font-mono text-xs text-[#475569] dark:text-[#cbd5e1]">{whatsappStatus.device_id || '-'}</p>
+                          </div>
+                        </div>
+                      )}
                       {whatsappStatus?.connection?.error && (
                         <p className="text-[11px] text-[#dc2626] mt-3">{whatsappStatus.connection.error}</p>
                       )}

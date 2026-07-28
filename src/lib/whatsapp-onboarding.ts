@@ -1,11 +1,13 @@
 export interface WhatsAppIntegrationStatus {
   enabled: boolean;
   configured: boolean;
+  device_id?: string;
   connection?: {
     state: string;
     connected: boolean;
     logged_in: boolean;
     jid?: string;
+    phone_number?: string;
     error?: string;
   };
 }
@@ -90,4 +92,3 @@ export function getWhatsAppReadiness(status: WhatsAppIntegrationStatus | null): 
     message: 'Klik Hubungkan WhatsApp di Pengaturan > Integrasi, lalu pindai QR dari aplikasi WhatsApp.',
   };
 }
-
