@@ -151,7 +151,7 @@ export default function TamuDetail() {
   } = useInvitations(currentEventId);
   const { rsvps, saveRSVPForGuest } = useRSVP(currentEventId);
   const { templates } = useTemplates();
-  const { sendWhatsApp, isSending: isSendingWhatsApp } = useWhatsAppMessaging();
+  const { sendWhatsApp, ensureReady, isSending: isSendingWhatsApp } = useWhatsAppMessaging();
   const [showRsvpEdit, setShowRsvpEdit] = useState(false);
   const [selectedRsvpStatus, setSelectedRsvpStatus] = useState<EditableRSVPStatus>('attending');
   const [isSavingRsvp, setIsSavingRsvp] = useState(false);
@@ -283,9 +283,15 @@ export default function TamuDetail() {
     }
   };
 
-  const openWhatsAppModal = () => {
+  const openWhatsAppModal = async () => {
     if (!guest?.phone?.trim()) {
       toast.error('Nomor WhatsApp tamu belum diisi');
+      return;
+    }
+    try {
+      await ensureReady();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'WhatsApp belum siap digunakan');
       return;
     }
     setSelectedWhatsAppTemplate(whatsappTemplates[0]?.id || '');

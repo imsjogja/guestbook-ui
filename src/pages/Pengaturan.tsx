@@ -14,6 +14,8 @@ import {
   Mail,
   Loader2,
   QrCode,
+  MessageCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks';
@@ -33,6 +35,8 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { useSearchParams } from 'react-router-dom';
+import { getWhatsAppReadiness, type WhatsAppIntegrationStatus } from '@/lib/whatsapp-onboarding';
 
 
 
@@ -56,22 +60,29 @@ function getInitials(name?: string | null): string {
     .slice(0, 2);
 }
 
+function OnboardingStep({ number, label, complete }: { number: string; label: string; complete: boolean }) {
+  return (
+    <div className={cn(
+      'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs',
+      complete
+        ? 'border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]'
+        : 'border-[#e2e8f0] bg-[#f8fafc] text-[#64748b] dark:border-[#334155] dark:bg-[#1e293b]'
+    )}>
+      <span className={cn(
+        'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold',
+        complete ? 'bg-[#22c55e] text-white' : 'bg-[#e2e8f0] text-[#64748b] dark:bg-[#334155]'
+      )}>
+        {complete ? <CheckCircle2 size={13} /> : number}
+      </span>
+      {label}
+    </div>
+  );
+}
+
 interface PasswordStrength {
   score: number;
   label: string;
   color: string;
-}
-
-interface WhatsAppIntegrationStatus {
-  enabled: boolean;
-  configured: boolean;
-  connection?: {
-    state: string;
-    connected: boolean;
-    logged_in: boolean;
-    jid?: string;
-    error?: string;
-  };
 }
 
 function getPasswordStrength(password: string): PasswordStrength {
@@ -90,6 +101,7 @@ export default function Pengaturan() {
   const { user, logout } = useAuth();
   const setUser = useAuthStore((state) => state.setUser);
   const { currentTenant, setTenant } = useTenantStore();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>('profil');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -135,9 +147,21 @@ export default function Pengaturan() {
   const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppIntegrationStatus | null>(null);
   const [whatsappPairing, setWhatsappPairing] = useState(false);
   const [whatsappQR, setWhatsappQR] = useState<string | null>(null);
+  const [whatsappTestPhone, setWhatsappTestPhone] = useState('');
+  const [whatsappTestMessage, setWhatsappTestMessage] = useState('Tes koneksi WhatsApp GuestFlow.');
+  const [whatsappTestSending, setWhatsappTestSending] = useState(false);
+  const [whatsappTestResult, setWhatsappTestResult] = useState<{ to: string; sent_at?: string } | null>(null);
 
   const passwordStrength = getPasswordStrength(newPassword);
   const passwordsMatch = newPassword === confirmPassword && confirmPassword !== '';
+  const whatsappReadiness = getWhatsAppReadiness(whatsappStatus);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (settingTabs.some((tab) => tab.key === requestedTab)) {
+      setActiveTab(requestedTab as TabKey);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!user) return;
@@ -369,6 +393,32 @@ export default function Pengaturan() {
       toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menghubungkan WhatsApp');
     } finally {
       setWhatsappPairing(false);
+    }
+  };
+
+  const handleTestWhatsApp = async () => {
+    if (!whatsappTestPhone.trim()) {
+      toast.error('Masukkan nomor WhatsApp tujuan untuk uji kirim');
+      return;
+    }
+    if (!whatsappTestMessage.trim()) {
+      toast.error('Masukkan pesan uji kirim');
+      return;
+    }
+    setWhatsappTestSending(true);
+    setWhatsappTestResult(null);
+    try {
+      const response = await api.post<{ data: { to: string; sent_at?: string } }>('/integrations/whatsapp/test', {
+        to: whatsappTestPhone,
+        message: whatsappTestMessage,
+      });
+      setWhatsappTestResult(response.data.data);
+      toast.success('Pesan uji berhasil dikirim');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
+      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Pesan uji gagal dikirim');
+    } finally {
+      setWhatsappTestSending(false);
     }
   };
 
@@ -987,17 +1037,22 @@ export default function Pengaturan() {
                     </div>
                     <span className={cn(
                       'inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium border',
-                      whatsappStatus?.connection?.logged_in
+                      whatsappReadiness.ready
                         ? 'bg-[#d1fae5] text-[#065f46] border-[#10b981]/30'
-                        : whatsappStatus?.configured
+                        : whatsappStatus?.enabled
                           ? 'bg-[#fef3c7] text-[#92400e] border-[#f59e0b]/30'
                           : 'bg-[#f1f5f9] text-[#64748b] border-[#cbd5e1]'
                     )}>
-                      {whatsappStatus?.connection?.logged_in ? 'Terhubung' : whatsappStatus?.configured ? 'Belum terhubung' : 'Belum lengkap'}
+                      {whatsappReadiness.ready ? 'Siap digunakan' : whatsappStatus?.enabled ? 'Perlu diselesaikan' : 'Belum aktif'}
                     </span>
                   </div>
 
                   <div className="space-y-4">
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <OnboardingStep number="1" label="Aktifkan" complete={whatsappStatus?.enabled === true} />
+                      <OnboardingStep number="2" label="Hubungkan nomor" complete={whatsappStatus?.connection?.logged_in === true} />
+                      <OnboardingStep number="3" label="Uji kirim" complete={whatsappTestResult !== null} />
+                    </div>
                     <div className="flex items-center justify-between rounded-lg bg-[#f8fafc] dark:bg-[#1e293b] p-3">
                       <div>
                         <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">Aktifkan pengiriman WhatsApp</p>
@@ -1011,26 +1066,14 @@ export default function Pengaturan() {
                         <div>
                           <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">Status WhatsApp</p>
                           <p className="text-[11px] text-[#64748b] mt-1">
-                            {whatsappStatus?.connection?.state === 'logged_in'
-                              ? 'WhatsApp sudah terhubung dan siap mengirim undangan.'
-                              : whatsappStatus?.connection?.state === 'connected'
-                                ? 'WhatsApp terdeteksi, tetapi belum terhubung sepenuhnya.'
-                                : whatsappStatus?.connection?.state === 'disabled'
-                                  ? 'Aktifkan pengiriman WhatsApp lalu simpan perubahan.'
-                                : whatsappStatus?.connection?.state === 'not_registered'
-                                    ? 'WhatsApp belum terhubung. Klik hubungkan untuk mulai.'
-                                : whatsappStatus?.connection?.state === 'unauthorized'
-                                  ? 'Koneksi WhatsApp belum dapat digunakan. Hubungi administrator.'
-                                : whatsappStatus?.connection?.state === 'unavailable'
-                                  ? 'Layanan WhatsApp sedang tidak tersedia.'
-                                  : 'Hubungkan WhatsApp dengan memindai kode dari aplikasi WhatsApp.'}
+                            {whatsappReadiness.message}
                           </p>
                         </div>
                         <Button
                           type="button"
                           variant="outline"
                           onClick={handleStartWhatsAppPairing}
-                          disabled={whatsappPairing || !whatsappStatus?.configured}
+                          disabled={whatsappPairing || !whatsappStatus?.enabled || !whatsappStatus?.configured}
                           className="border-[#c7d2fe] text-[#4338ca] hover:bg-[#eef2ff]"
                         >
                           {whatsappPairing ? <Loader2 size={16} className="animate-spin" /> : <QrCode size={16} />}
@@ -1046,6 +1089,49 @@ export default function Pengaturan() {
                           <p className="text-xs text-center text-[#64748b]">Buka WhatsApp &gt; Perangkat tertaut &gt; Tautkan perangkat, lalu pindai kode ini.</p>
                         </div>
                       )}
+                    </div>
+
+                    <div className="rounded-lg border border-[#e2e8f0] dark:border-[#334155] p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 text-[#059669]"><MessageCircle size={18} /></div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">Uji kirim WhatsApp</p>
+                          <p className="text-[11px] text-[#64748b] mt-1">Kirim satu pesan percobaan ke nomor Anda sebelum mengirim undangan.</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-3">
+                        <Input
+                          value={whatsappTestPhone}
+                          onChange={(event) => setWhatsappTestPhone(event.target.value)}
+                          placeholder="Nomor tujuan, contoh 0812..."
+                          disabled={!whatsappReadiness.ready || whatsappTestSending}
+                        />
+                        <Textarea
+                          value={whatsappTestMessage}
+                          onChange={(event) => setWhatsappTestMessage(event.target.value)}
+                          rows={3}
+                          disabled={!whatsappReadiness.ready || whatsappTestSending}
+                        />
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-[11px] text-[#94a3b8]">Gunakan format 08xx atau 62xx.</p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleTestWhatsApp}
+                            disabled={!whatsappReadiness.ready || whatsappTestSending}
+                            className="border-[#a7f3d0] text-[#047857] hover:bg-[#ecfdf5]"
+                          >
+                            {whatsappTestSending ? <Loader2 size={15} className="animate-spin" /> : <MessageCircle size={15} />}
+                            Uji Kirim
+                          </Button>
+                        </div>
+                        {whatsappTestResult && (
+                          <div className="flex items-start gap-2 rounded-lg bg-[#ecfdf5] px-3 py-2 text-xs text-[#166534]">
+                            <CheckCircle2 size={15} className="mt-0.5 flex-shrink-0" />
+                            <span>Pesan diterima layanan untuk {whatsappTestResult.to}. Periksa WhatsApp tujuan.</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 

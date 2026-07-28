@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send,
@@ -42,6 +43,7 @@ import { useTenantStore } from '@/store/tenantStore';
 import { QRCodeSVG } from '@/components/QRCodeSVG';
 import { toast } from 'sonner';
 import { getInvitationGuestDisplay } from '@/lib/invitation-display';
+import { WhatsAppOnboardingCard } from '@/components/WhatsAppOnboardingCard';
 
 /* ── Extended UI Type ─────────────────────────────── */
 type InvitationStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | 'revoked';
@@ -124,11 +126,18 @@ const statusConfig: Record<
 /* ── Main Component ───────────────────────────────── */
 
 export default function Undangan() {
+  const navigate = useNavigate();
   const currentEventId = useTenantStore((s) => s.currentEvent?.id);
   const { invitations, isLoading, error, refetch, refresh, batchCreate, revokeInvitation } = useInvitations(currentEventId);
   const { guests: rosterGuests } = useGuests(currentEventId);
   const { templates } = useTemplates();
-  const { sendMessage, sendWhatsApp, isSending: isSendingWhatsApp } = useWhatsAppMessaging();
+  const {
+    sendMessage,
+    sendWhatsApp,
+    ensureReady,
+    whatsappStatus,
+    isSending: isSendingWhatsApp,
+  } = useWhatsAppMessaging();
   const [search, setSearch] = useState('');
   const [channelFilter, setChannelFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -178,6 +187,9 @@ export default function Undangan() {
     () => templates.filter((template) => template.channel === 'whatsapp' && template.isActive),
     [templates]
   );
+  const whatsappReady = whatsappStatus?.enabled === true
+    && whatsappStatus.configured
+    && whatsappStatus.connection?.logged_in === true;
   const emailTemplates = useMemo(
     () => templates.filter((template) => template.channel === 'email' && template.isActive),
     [templates]
@@ -282,7 +294,11 @@ export default function Undangan() {
       return;
     }
     try {
-      const result = await sendMessage({ guest_ids: [inv.guestId], template_id: templateId });
+      const result = await sendMessage({
+        guest_ids: [inv.guestId],
+        template_id: templateId,
+        channel: inv.channel === 'email' ? 'email' : 'whatsapp',
+      });
       await refresh();
       const failedCount = countFailedMessages(result);
       if (failedCount > 0) {
@@ -325,6 +341,14 @@ export default function Undangan() {
         return;
       }
     }
+    if (batchChannel === 'whatsapp') {
+      try {
+        await ensureReady();
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'WhatsApp belum siap digunakan');
+        return;
+      }
+    }
     const created = await batchCreate(batchGuests, batchChannel, batchTemplateId);
     if (created.length === 0) return;
     if (batchChannel === 'whatsapp' || batchChannel === 'email') {
@@ -332,6 +356,7 @@ export default function Undangan() {
         const result = await sendMessage({
           guest_ids: created.map((invitation) => invitation.guestId),
           template_id: batchTemplateId,
+          channel: batchChannel === 'email' ? 'email' : 'whatsapp',
         });
         await refresh();
         const failedCount = countFailedMessages(result);
@@ -351,7 +376,13 @@ export default function Undangan() {
     setBatchGuests([]);
   };
 
-  const openSendModal = (guestIds: string[]) => {
+  const openSendModal = async (guestIds: string[]) => {
+    try {
+      await ensureReady();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'WhatsApp belum siap digunakan');
+      return;
+    }
     setSendTargetIds(guestIds);
     setSendTemplateId(whatsappTemplates[0]?.id || '');
     setSendModalOpen(true);
@@ -441,7 +472,7 @@ export default function Undangan() {
           <Button
             variant="outline"
             size="sm"
-            disabled={selectedIds.size === 0}
+            disabled={selectedIds.size === 0 || !whatsappReady}
             onClick={() => openSendModal(uiInvitations.filter((inv) => selectedIds.has(inv.id)).map((inv) => inv.guestId))}
             className="text-[#059669] border-[#a7f3d0] hover:bg-[#ecfdf5] disabled:opacity-40"
           >
@@ -471,6 +502,11 @@ export default function Undangan() {
           </Button>
         </div>
       </div>
+
+      <WhatsAppOnboardingCard
+        status={whatsappStatus}
+        onOpenSettings={() => navigate('/pengaturan?tab=integrasi')}
+      />
 
       {/* Stats Bar */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -688,7 +724,8 @@ export default function Undangan() {
                           {inv.status === 'failed' && (
                             <button
                               onClick={() => handleResend(inv)}
-                              className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors"
+                              disabled={inv.channel !== 'email' && !whatsappReady}
+                              className="p-1.5 rounded-md hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] text-[#64748b] hover:text-[#4f46e5] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                               title="Kirim Ulang"
                             >
                               <RotateCcw size={15} />
@@ -706,7 +743,8 @@ export default function Undangan() {
                           {inv.invitationStatus !== 'revoked' && (
                             <button
                               onClick={() => openSendModal([inv.guestId])}
-                              className="p-1.5 rounded-md hover:bg-[#ecfdf5] text-[#64748b] hover:text-[#059669] transition-colors"
+                              disabled={!whatsappReady}
+                              className="p-1.5 rounded-md hover:bg-[#ecfdf5] text-[#64748b] hover:text-[#059669] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                               title="Kirim WhatsApp"
                             >
                               <MessageCircle size={15} />
@@ -781,7 +819,7 @@ export default function Undangan() {
             <Button variant="outline" onClick={() => setSendModalOpen(false)}>Batal</Button>
             <Button
               onClick={handleSendSelectedWhatsApp}
-              disabled={!sendTemplateId || missingTargetPhones.length > 0 || isSendingWhatsApp}
+              disabled={!sendTemplateId || missingTargetPhones.length > 0 || !whatsappReady || isSendingWhatsApp}
               className="gap-2"
             >
               {isSendingWhatsApp && <Loader2 size={14} className="animate-spin" />}
