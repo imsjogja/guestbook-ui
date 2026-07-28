@@ -22,7 +22,7 @@ export interface RegisterRequest {
   fullName: string;
   email: string;
   password: string;
-  tenantSubdomain?: string;
+  tenantName?: string;
 }
 
 export interface AuthResponse {
@@ -37,6 +37,8 @@ export interface RegistrationResponse {
   message: string;
   email_verification_required: boolean;
   user: User;
+  tenant_id: string;
+  tenant_role: string;
 }
 
 // ── Tenant ────────────────────────────────────────────

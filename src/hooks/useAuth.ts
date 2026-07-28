@@ -36,7 +36,12 @@ export function useAuth() {
         return response.data;
       } catch (err: unknown) {
         const axiosErr = err as { response?: { data?: { message?: string; error?: string; code?: string } } };
-        setErrorCode(axiosErr.response?.data?.code ?? null);
+        const code = axiosErr.response?.data?.code ?? null;
+        setErrorCode(code);
+        if (code === 'EMAIL_NOT_VERIFIED') {
+          // Do not leave a stale session active when authentication is rejected.
+          storeLogout();
+        }
         const isNetworkError =
           !axiosErr.response ||
           (err instanceof Error && err.message === 'Network Error');
@@ -49,7 +54,7 @@ export function useAuth() {
         setIsLoading(false);
       }
     },
-    [storeLogin]
+    [storeLogin, storeLogout]
   );
 
   const register = useCallback(
@@ -62,7 +67,7 @@ export function useAuth() {
           full_name: data.fullName,
           email: data.email,
           password: data.password,
-          tenant_subdomain: data.tenantSubdomain,
+          tenant_name: data.tenantName,
         });
         if ('email_verification_required' in response.data && response.data.email_verification_required) {
           return response.data;
@@ -72,7 +77,9 @@ export function useAuth() {
         storeLogin(access_token, refresh_token, userData);
         return response.data;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string; error?: string; errors?: Record<string, string[]> } } };
+        const axiosErr = err as { response?: { data?: { message?: string; error?: string; code?: string; errors?: Record<string, string[]> } } };
+        const code = axiosErr.response?.data?.code ?? null;
+        setErrorCode(code);
         const isNetworkError =
           !axiosErr.response ||
           (err instanceof Error && err.message === 'Network Error');
@@ -89,7 +96,9 @@ export function useAuth() {
           errorMsg = msg ?? fallback ?? 'Registrasi gagal. Silakan coba lagi.';
         }
         setError(errorMsg);
-        throw new Error(errorMsg);
+        const registrationError = new Error(errorMsg) as Error & { code?: string };
+        registrationError.code = code ?? undefined;
+        throw registrationError;
       } finally {
         setIsLoading(false);
       }

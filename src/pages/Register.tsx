@@ -16,15 +16,18 @@ const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register, isLoading, error } = useAuth();
+  const { register, resendVerification, isLoading, error, errorCode } = useAuth();
 
   const [fullName, setFullName] = useState('');
+  const [tenantName, setTenantName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [shakeError, setShakeError] = useState(false);
   const [verificationRequired, setVerificationRequired] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [resendFailed, setResendFailed] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -35,7 +38,7 @@ export default function Register() {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       setShakeError(true);
       setTimeout(() => setShakeError(false), 300);
       return;
@@ -46,13 +49,35 @@ export default function Register() {
         fullName,
         email,
         password,
+        tenantName,
       });
       if ('email_verification_required' in result && result.email_verification_required) {
         setVerificationRequired(true);
+        setResendMessage(null);
+        setResendFailed(false);
       } else {
         navigate('/');
       }
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code ?? errorCode;
+      if (code === 'EMAIL_DELIVERY_FAILED') {
+        setVerificationRequired(true);
+        setResendFailed(true);
+        setResendMessage('Akun owner sudah dibuat, tetapi email awal belum berhasil dikirim. Gunakan tombol di bawah untuk mencoba lagi.');
+      }
+      setShakeError(true);
+      setTimeout(() => setShakeError(false), 300);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    try {
+      await resendVerification(email);
+      setResendFailed(false);
+      setResendMessage('Email verifikasi baru sudah dikirim. Periksa Inbox atau Spam.');
     } catch {
+      setResendFailed(true);
+      setResendMessage('Email belum berhasil dikirim ulang. Periksa konfigurasi email atau coba lagi beberapa saat.');
       setShakeError(true);
       setTimeout(() => setShakeError(false), 300);
     }
@@ -143,11 +168,30 @@ export default function Register() {
                   Cek email Anda
                 </h2>
                 <p className="text-sm text-[#64748b] leading-relaxed">
-                  Kami sudah mengirim tautan verifikasi ke <strong className="text-[#1e293b]">{email}</strong>. Verifikasi email sebelum masuk ke GuestFlow.
+                  Tautan verifikasi akan dikirim ke <strong className="text-[#1e293b]">{email}</strong>. Verifikasi email sebelum masuk ke GuestFlow sebagai Tenant Owner.
                 </p>
+                {error && (
+                  <p className="mt-4 px-3 py-2 rounded-lg bg-[#fff1f2] text-sm text-[#e11d48]">
+                    {error}
+                  </p>
+                )}
+                {resendMessage && (
+                  <p className={`mt-4 px-3 py-2 rounded-lg text-sm ${resendFailed ? 'bg-[#fff1f2] text-[#e11d48]' : 'bg-[#ecfdf5] text-[#047857]'}`}>
+                    {resendMessage}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void handleResendVerification()}
+                  disabled={isLoading}
+                  className="mt-6 w-full h-11 border border-[#c7d2fe] text-[#4f46e5] hover:bg-[#eef2ff] font-medium rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+                >
+                  {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
+                  {isLoading ? 'Mengirim ulang...' : 'Kirim ulang email verifikasi'}
+                </button>
                 <Link
                   to="/login"
-                  className="mt-6 w-full h-11 bg-[#4f46e5] hover:bg-[#6366f1] text-white font-medium rounded-lg flex items-center justify-center transition-colors"
+                  className="mt-3 w-full h-11 bg-[#4f46e5] hover:bg-[#6366f1] text-white font-medium rounded-lg flex items-center justify-center transition-colors"
                 >
                   Kembali ke halaman masuk
                 </Link>
@@ -205,6 +249,26 @@ export default function Register() {
                 </div>
               </div>
 
+              {/* Workspace / tenant */}
+              <div>
+                <label className="block text-xs font-medium text-[#64748b] mb-1.5">
+                  Nama Workspace / Mitra
+                </label>
+                <div className="relative">
+                  <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]" />
+                  <input
+                    type="text"
+                    value={tenantName}
+                    onChange={(e) => setTenantName(e.target.value)}
+                    placeholder="Contoh: Wedding Organizer Bambang"
+                    required
+                    minLength={2}
+                    className="w-full h-10 pl-9 pr-3 rounded-lg border border-[#e2e8f0] dark:border-[#334155] bg-white dark:bg-[#0b0f19] text-sm text-[#0f172a] dark:text-[#f8fafc] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all"
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-[#94a3b8]">Anda otomatis menjadi Tenant Owner workspace ini.</p>
+              </div>
+
               {/* Password */}
               <div>
                 <label className="block text-xs font-medium text-[#64748b] mb-1.5">
@@ -216,9 +280,9 @@ export default function Register() {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimal 6 karakter"
+                    placeholder="Minimal 8 karakter"
                     required
-                    minLength={6}
+                    minLength={8}
                     className="w-full h-10 pl-9 pr-10 rounded-lg border border-[#e2e8f0] dark:border-[#334155] bg-white dark:bg-[#0b0f19] text-sm text-[#0f172a] dark:text-[#f8fafc] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all"
                   />
                   <button
