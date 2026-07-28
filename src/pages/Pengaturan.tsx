@@ -87,7 +87,7 @@ interface PasswordStrength {
 }
 
 function formatWhatsAppNumber(status: WhatsAppIntegrationStatus | null): string {
-  const raw = status?.connection?.phone_number || status?.connection?.jid || '';
+  const raw = status?.connection?.phone_number || '';
   if (!raw) return '-';
   return raw.replace(/@.*$/, '').replace(/:.*$/, '');
 }
@@ -1125,7 +1125,12 @@ export default function Pengaturan() {
                         <div className="mt-4 grid gap-3 rounded-lg bg-[#f8fafc] p-3 dark:bg-[#1e293b] sm:grid-cols-2">
                           <div>
                             <p className="text-[11px] text-[#94a3b8]">Nomor WhatsApp terhubung</p>
-                            <p className="mt-1 text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">+{formatWhatsAppNumber(whatsappStatus)}</p>
+                            <p className="mt-1 text-sm font-medium text-[#1e293b] dark:text-[#f8fafc]">
+                              {(() => {
+                                const phone = formatWhatsAppNumber(whatsappStatus);
+                                return phone === '-' ? phone : `+${phone}`;
+                              })()}
+                            </p>
                           </div>
                           <div>
                             <p className="text-[11px] text-[#94a3b8]">Device ID</p>
