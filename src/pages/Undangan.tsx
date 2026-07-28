@@ -190,6 +190,7 @@ export default function Undangan() {
   const whatsappReady = whatsappStatus?.enabled === true
     && whatsappStatus.configured
     && whatsappStatus.connection?.logged_in === true;
+  const canSendBatch = batchChannel !== 'whatsapp' || whatsappReady;
   const emailTemplates = useMemo(
     () => templates.filter((template) => template.channel === 'email' && template.isActive),
     [templates]
@@ -319,29 +320,31 @@ export default function Undangan() {
     setBatchModalOpen(true);
   };
 
-  const sendBatch = async () => {
-    if (batchChannel === 'whatsapp') {
-      if (!batchTemplateId) {
-        toast.error('Belum ada template WhatsApp aktif');
-        return;
-      }
-      const missing = batchCandidates.filter((guest) => batchGuests.includes(guest.id) && !guest.phone?.trim());
-      if (missing.length > 0) {
-        toast.error(`Nomor WhatsApp belum diisi untuk ${missing.length} tamu`);
-        return;
-      }
-    } else {
-      if (!batchTemplateId) {
-        toast.error('Belum ada template Email aktif');
-        return;
-      }
-      const missing = batchCandidates.filter((guest) => batchGuests.includes(guest.id) && !guest.email?.trim());
-      if (missing.length > 0) {
-        toast.error(`Email belum diisi untuk ${missing.length} tamu`);
-        return;
+  const sendBatch = async (mode: 'generate' | 'send') => {
+    if (mode === 'send') {
+      if (batchChannel === 'whatsapp') {
+        if (!batchTemplateId) {
+          toast.error('Belum ada template WhatsApp aktif');
+          return;
+        }
+        const missing = batchCandidates.filter((guest) => batchGuests.includes(guest.id) && !guest.phone?.trim());
+        if (missing.length > 0) {
+          toast.error(`Nomor WhatsApp belum diisi untuk ${missing.length} tamu`);
+          return;
+        }
+      } else {
+        if (!batchTemplateId) {
+          toast.error('Belum ada template Email aktif');
+          return;
+        }
+        const missing = batchCandidates.filter((guest) => batchGuests.includes(guest.id) && !guest.email?.trim());
+        if (missing.length > 0) {
+          toast.error(`Email belum diisi untuk ${missing.length} tamu`);
+          return;
+        }
       }
     }
-    if (batchChannel === 'whatsapp') {
+    if (mode === 'send' && batchChannel === 'whatsapp') {
       try {
         await ensureReady();
       } catch (err: unknown) {
@@ -351,7 +354,10 @@ export default function Undangan() {
     }
     const created = await batchCreate(batchGuests, batchChannel, batchTemplateId);
     if (created.length === 0) return;
-    if (batchChannel === 'whatsapp' || batchChannel === 'email') {
+    if (mode === 'generate') {
+      await refresh();
+      toast.success(`${created.length} undangan berhasil dibuat`);
+    } else if (batchChannel === 'whatsapp' || batchChannel === 'email') {
       try {
         const result = await sendMessage({
           guest_ids: created.map((invitation) => invitation.guestId),
@@ -369,8 +375,6 @@ export default function Undangan() {
         await refresh();
         toast.error(err instanceof Error ? err.message : `Gagal mengirim ${batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'}`);
       }
-    } else {
-      toast.success(`${created.length} undangan berhasil dibuat`);
     }
     setBatchModalOpen(false);
     setBatchGuests([]);
@@ -958,7 +962,7 @@ export default function Undangan() {
                 </label>
                 <Select value={batchTemplateId} onValueChange={setBatchTemplateId}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Pilih template WhatsApp" />
+                    <SelectValue placeholder={`Pilih template ${batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'}`} />
                   </SelectTrigger>
                   <SelectContent>
                     {(batchChannel === 'whatsapp' ? whatsappTemplates : emailTemplates).map((template) => (
@@ -979,11 +983,18 @@ export default function Undangan() {
                 <Check size={28} className="text-[#10b981]" />
               </div>
               <p className="text-lg font-semibold text-[#1e293b] dark:text-[#f8fafc]">
-                {batchGuests.length} undangan akan dikirim
+                {batchGuests.length} undangan siap dibuat
               </p>
-              <p className="text-sm text-[#64748b]">
-                via {batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'} menggunakan {whatsappTemplates.find((template) => template.id === batchTemplateId)?.name || 'template terpilih'}
-              </p>
+              {batchChannel === 'whatsapp' && !whatsappReady ? (
+                <p className="text-sm text-[#64748b]">
+                  WhatsApp belum terhubung. Anda tetap dapat membuat link undangan sekarang, lalu mengirimkannya setelah WhatsApp siap.
+                </p>
+              ) : (
+                <p className="text-sm text-[#64748b]">
+                  Channel: {batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'}
+                  {batchTemplateId ? ` menggunakan ${(batchChannel === 'whatsapp' ? whatsappTemplates : emailTemplates).find((template) => template.id === batchTemplateId)?.name || 'template terpilih'}` : ''}
+                </p>
+              )}
             </div>
           )}
 
@@ -1004,10 +1015,18 @@ export default function Undangan() {
                 Lanjut
               </Button>
             ) : (
-              <Button onClick={sendBatch}>
-                <Send size={14} />
-                Generate dan Kirim
-              </Button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="outline" onClick={() => sendBatch('generate')}>
+                  <QrCode size={14} />
+                  Generate Saja
+                </Button>
+                {canSendBatch && (
+                  <Button onClick={() => sendBatch('send')} disabled={!batchTemplateId}>
+                    <Send size={14} />
+                    Generate dan Kirim
+                  </Button>
+                )}
+              </div>
             )}
           </DialogFooter>
         </DialogContent>
