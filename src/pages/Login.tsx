@@ -78,28 +78,34 @@ export default function Login() {
 
   return (
     <div className="min-h-[100dvh] flex bg-[#f8fafc] dark:bg-[#0b0f19]">
-      {/* Left panel - decorative (desktop only) */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center">
-        <div className="absolute inset-0 bg-[#f8fafc]" />
-        {/* Decorative shapes */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-20 left-20 w-72 h-72 rounded-full bg-[#4f46e5]/5 blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-96 h-96 rounded-full bg-[#4f46e5]/5 blur-3xl" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-[#6366f1]/5 blur-2xl" />
-        </div>
-        <div className="relative z-10 max-w-md px-8">
+      {/* Left panel - video hero (desktop only) */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-end bg-[#0f172a]">
+        <video
+          className="absolute inset-0 h-full w-full object-cover"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          aria-hidden="true"
+        >
+          <source src="/guestflow-login-hero.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-gradient-to-br from-[#020617]/80 via-[#0f172a]/25 to-[#4f46e5]/65" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#020617]/85 via-transparent to-transparent" />
+        <div className="relative z-10 max-w-xl px-10 pb-12 xl:px-14 xl:pb-16">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4, ease: easeOutExpo }}
           >
-            <div className="w-16 h-16 rounded-2xl bg-[#4f46e5] flex items-center justify-center mb-8 shadow-lg">
+            <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center mb-8 shadow-lg">
               <span className="text-white font-bold text-2xl">G</span>
             </div>
-            <h2 className="text-2xl font-bold text-[#0f172a] dark:text-[#f8fafc] mb-4 leading-snug">
+            <h2 className="text-3xl xl:text-4xl font-bold text-white mb-4 leading-tight">
               Kelola tamu acara Anda dengan elegan dan efisien.
             </h2>
-            <p className="text-[#64748b] leading-relaxed">
+            <p className="text-white/75 leading-relaxed max-w-lg">
               GuestFlow membantu Anda mengelola undangan, RSVP, check-in QR, dan pengaturan tempat duduk — semua dalam satu platform terpadu.
             </p>
             <div className="mt-8 flex items-center gap-4">
@@ -107,14 +113,14 @@ export default function Login() {
                 {[1, 2, 3, 4].map((i) => (
                   <div
                     key={i}
-                    className="w-8 h-8 rounded-full bg-[#e2e8f0] border-2 border-white dark:border-[#151c2c] flex items-center justify-center text-xs font-medium text-[#64748b]"
+                    className="w-8 h-8 rounded-full bg-white/20 border-2 border-white/70 flex items-center justify-center text-xs font-medium text-white"
                   >
                     {String.fromCharCode(64 + i)}
                   </div>
                 ))}
               </div>
-              <p className="text-sm text-[#64748b]">
-                <span className="font-semibold text-[#1e293b] dark:text-[#f8fafc]">1,200+</span> event organizer mempercayai GuestFlow
+              <p className="text-sm text-white/75">
+                <span className="font-semibold text-white">1,200+</span> event organizer mempercayai GuestFlow
               </p>
             </div>
           </motion.div>
