@@ -151,9 +151,11 @@ export default function Sidebar() {
         {/* Logo */}
         <div className="h-16 flex items-center px-4 border-b border-[#e2e8f0] dark:border-[#334155]">
           <Link to="/" className="flex items-center gap-3 overflow-hidden">
-            <div className="w-8 h-8 rounded-lg bg-[#4f46e5] flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-sm">G</span>
-            </div>
+            <img
+              src="/logos/guestflow-ikon.svg"
+              alt="GuestFlow"
+              className="w-8 h-8 rounded-lg flex-shrink-0"
+            />
             {!collapsed && (
               <motion.span
                 initial={{ opacity: 0, x: -8 }}
@@ -248,9 +250,11 @@ export default function Sidebar() {
             {/* Logo */}
             <div className="h-16 flex items-center px-4 border-b border-[#e2e8f0] dark:border-[#334155]">
               <Link to="/" className="flex items-center gap-3" onClick={() => setMobileOpen(false)}>
-                <div className="w-8 h-8 rounded-lg bg-[#4f46e5] flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-bold text-sm">G</span>
-                </div>
+                <img
+                  src="/logos/guestflow-ikon.svg"
+                  alt="GuestFlow"
+                  className="w-8 h-8 rounded-lg flex-shrink-0"
+                />
                 <span className="font-semibold text-lg text-[#0f172a] dark:text-[#f8fafc]">
                   GuestFlow
                 </span>

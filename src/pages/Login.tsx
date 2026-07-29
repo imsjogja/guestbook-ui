@@ -100,7 +100,11 @@ export default function Login() {
             transition={{ duration: 0.4, ease: easeOutExpo }}
           >
             <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center mb-8 shadow-lg">
-              <span className="text-white font-bold text-2xl">G</span>
+              <img
+                src="/logos/guestflow-ikon.svg"
+                alt="GuestFlow"
+                className="w-12 h-12 rounded-xl"
+              />
             </div>
             <h2 className="text-3xl xl:text-4xl font-bold text-white mb-4 leading-tight">
               Kelola tamu acara Anda dengan elegan dan efisien.
@@ -146,9 +150,11 @@ export default function Login() {
         >
           {/* Brand header */}
           <div className="text-center mb-8">
-            <div className="w-12 h-12 rounded-xl bg-[#4f46e5] flex items-center justify-center mx-auto mb-4 shadow-md lg:hidden">
-              <span className="text-white font-bold text-lg">G</span>
-            </div>
+            <img
+              src="/logos/guestflow-ikon.svg"
+              alt="GuestFlow"
+              className="w-12 h-12 rounded-xl mx-auto mb-4 shadow-md lg:hidden"
+            />
             <h1 className="text-2xl font-bold text-[#0f172a] dark:text-[#f8fafc]">
               GuestFlow
             </h1>
