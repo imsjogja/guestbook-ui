@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
 import type { ApiResponse, EventAccess, EventMember, EventRole } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
+import { getApiErrorMessage } from '@/lib/localization';
 
 export function useEventMembers(eventId?: string) {
   const currentEventId = useTenantStore((state) => state.currentEvent?.id);
@@ -30,9 +31,8 @@ export function useEventMembers(eventId?: string) {
       // Keep the UI aligned with the active assignment model during rollout.
       setMembers((membersResult.value.data.data ?? []).filter((member) => member.status !== 'inactive'));
     } else {
-      const axiosErr = membersResult.reason as { response?: { data?: { error?: string; message?: string } } };
       setMembers([]);
-      setError(axiosErr.response?.data?.error ?? axiosErr.response?.data?.message ?? 'Gagal memuat tim acara');
+      setError(getApiErrorMessage(membersResult.reason, 'Gagal memuat tim acara'));
     }
 
     if (accessResult.status === 'fulfilled') {
@@ -40,8 +40,7 @@ export function useEventMembers(eventId?: string) {
     } else {
       setAccess(null);
       if (membersResult.status === 'fulfilled') {
-        const axiosErr = accessResult.reason as { response?: { data?: { error?: string; message?: string } } };
-        setError(axiosErr.response?.data?.error ?? axiosErr.response?.data?.message ?? 'Gagal memuat akses acara');
+        setError(getApiErrorMessage(accessResult.reason, 'Gagal memuat akses acara'));
       }
     }
     setIsLoading(false);

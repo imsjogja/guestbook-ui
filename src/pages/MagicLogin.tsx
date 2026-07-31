@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { getApiErrorMessage } from '@/lib/localization';
 
 export default function MagicLogin() {
   const [searchParams] = useSearchParams();
@@ -24,7 +25,7 @@ export default function MagicLogin() {
       })
       .catch((err: unknown) => {
         setState('error');
-        setMessage(err instanceof Error ? err.message : 'Link masuk tidak valid atau sudah kedaluwarsa.');
+        setMessage(getApiErrorMessage(err, 'Link masuk tidak valid atau sudah kedaluwarsa.'));
       });
   }, [consumeMagicLink, searchParams]);
 

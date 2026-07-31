@@ -22,6 +22,7 @@ import type { Guest } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/localization';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -82,8 +83,7 @@ const rsvpDot: Record<string, string> = {
 };
 
 function toastError(err: unknown, fallback: string) {
-  const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-  toast.error(axiosErr.response?.data?.error ?? axiosErr.response?.data?.message ?? (err instanceof Error ? err.message : fallback));
+  toast.error(getApiErrorMessage(err, fallback));
 }
 
 /* ─── Component ─── */
@@ -135,8 +135,7 @@ export default function KelompokKeluarga() {
       }));
       setHouseholds(loaded);
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-      setHouseholdError(axiosErr.response?.data?.error ?? axiosErr.response?.data?.message ?? 'Gagal memuat kelompok keluarga');
+      setHouseholdError(getApiErrorMessage(err, 'Gagal memuat kelompok keluarga'));
     } finally {
       setIsLoadingHouseholds(false);
     }

@@ -30,6 +30,7 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { normalizeScanToken } from '@/lib/scan-token';
 import { useTenantStore } from '@/store/tenantStore';
+import { getApiErrorMessage } from '@/lib/localization';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -63,8 +64,8 @@ function getStatusIcon(status: string) {
 function getCheckinMethodLabel(method: string): string {
   if (method === 'self_service') return 'Mandiri';
   if (method === 'qr') return 'Scan QR';
-  if (method === 'manual') return 'Manual';
-  return 'Walk-in';
+  if (method === 'manual') return 'Pencarian manual';
+  return 'Tamu langsung';
 }
 
 function formatTimeAgo(dateStr: string): string {
@@ -162,7 +163,7 @@ function ScannerTab({ onCheckinSuccess }: { onCheckinSuccess: (name: string) => 
       onCheckinSuccess(label);
       setScanInput('');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memindai QR';
+      const msg = getApiErrorMessage(err, 'Gagal memindai QR');
       if (/already checked in|sudah check-in/i.test(msg)) {
         setOverlayTitle('Sudah Check-in');
       } else if (/another event|event lain|acara lain/i.test(msg)) {
@@ -428,7 +429,7 @@ function ManualTab({ onCheckinSuccess }: { onCheckinSuccess: (_name: string) => 
         setPaxCount(1);
       }, 2000);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal melakukan check-in';
+      const msg = getApiErrorMessage(err, 'Gagal melakukan check-in');
       setSubmitError(msg);
     } finally {
       setIsSubmitting(false);
@@ -449,14 +450,14 @@ function ManualTab({ onCheckinSuccess }: { onCheckinSuccess: (_name: string) => 
         children: 0,
       });
       setWalkInCheckedIn(true);
-      onCheckinSuccess(`Walk-in: ${walkInForm.fullName}`);
+      onCheckinSuccess(`Tamu langsung: ${walkInForm.fullName}`);
       setTimeout(() => {
         setWalkInCheckedIn(false);
         setWalkInForm({ fullName: '', phone: '', category: 'friend', pax: 1 });
         setShowWalkIn(false);
       }, 2000);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal mendaftarkan walk-in';
+      const msg = getApiErrorMessage(err, 'Gagal mendaftarkan tamu langsung');
       setSubmitError(msg);
     } finally {
       setIsSubmitting(false);
@@ -619,7 +620,7 @@ function ManualTab({ onCheckinSuccess }: { onCheckinSuccess: (_name: string) => 
             <div className="w-8 h-8 rounded-lg bg-[#fef3c7] flex items-center justify-center">
               <UserPlus size={16} className="text-[#d97706]" />
             </div>
-            <span className="font-medium text-sm text-[#0f172a] dark:text-[#f8fafc]">Daftar Walk-in Baru</span>
+            <span className="font-medium text-sm text-[#0f172a] dark:text-[#f8fafc]">Daftar Tamu Langsung Baru</span>
           </div>
           <ChevronRight
             size={16}
@@ -647,7 +648,7 @@ function ManualTab({ onCheckinSuccess }: { onCheckinSuccess: (_name: string) => 
                     >
                       <Check size={32} className="text-white" />
                     </motion.div>
-                    <p className="text-lg font-semibold text-[#0f172a] dark:text-[#f8fafc]">Walk-in Berhasil!</p>
+                    <p className="text-lg font-semibold text-[#0f172a] dark:text-[#f8fafc]">Tamu Langsung Berhasil!</p>
                   </div>
                 ) : (
                   <div className="space-y-4 pt-4">
@@ -711,7 +712,7 @@ function ManualTab({ onCheckinSuccess }: { onCheckinSuccess: (_name: string) => 
                       disabled={!walkInForm.fullName || isSubmitting}
                     >
                       {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                      Check-in Walk-in
+                      Check-in Tamu Langsung
                     </Button>
                   </div>
                 )}
@@ -765,7 +766,7 @@ function RecentTab({ checkins, isLoading }: { checkins: import('@/types').Checki
           {getStatusIcon(item.checkinMethod === 'walk_in' ? 'walk_in' : 'success')}
           <div className="flex-1 min-w-0">
             <p className="font-medium text-sm text-[#0f172a] dark:text-[#f8fafc] truncate">
-              {item.checkinMethod === 'walk_in' ? `Walk-in: ${item.notes || 'Tamu'}` : item.guestId}
+              {item.checkinMethod === 'walk_in' ? `Tamu langsung: ${item.notes || 'Tamu'}` : item.guestId}
             </p>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-xs text-[#64748b] font-mono">
@@ -833,7 +834,7 @@ export default function Checkin() {
         <AlertCircle size={48} className="text-[#f59e0b] mb-4" />
         <p className="text-[#0f172a] dark:text-[#f8fafc] font-medium mb-2">Akses check-in terbatas</p>
         <p className="text-sm text-[#64748b] max-w-md">
-          Role Anda tidak memiliki izin melihat atau memproses check-in. Gunakan Registration Officer, Usher, Event Manager, atau Tenant Owner.
+          Peran Anda tidak memiliki izin melihat atau memproses check-in. Gunakan Petugas registrasi, Petugas penerima tamu, Manajer acara, atau Pemilik tenant.
         </p>
       </div>
     );
@@ -897,7 +898,7 @@ export default function Checkin() {
             className="gap-2 data-[state=active]:bg-[#eef2ff] data-[state=active]:text-[#4f46e5] rounded-lg px-4"
           >
             <Keyboard size={16} />
-            Manual
+            Pencarian manual
           </TabsTrigger>
           <TabsTrigger
             value="recent"
@@ -953,7 +954,7 @@ export default function Checkin() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-[#0f172a] dark:text-[#f8fafc] truncate">
-                            {item.checkinMethod === 'walk_in' ? `Walk-in: ${item.notes || 'Tamu'}` : item.guestId}
+                            {item.checkinMethod === 'walk_in' ? `Tamu langsung: ${item.notes || 'Tamu'}` : item.guestId}
                           </p>
                           <div className="flex items-center gap-1.5">
                             <span className="text-[11px] text-[#94a3b8] font-mono">

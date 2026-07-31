@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
 import type { Message } from '@/types';
+import { getApiErrorMessage } from '@/lib/localization';
 
 type BackendMessage = {
   id: string;
@@ -86,7 +87,7 @@ export function useMessages(eventId?: string): UseMessagesReturn {
       setTotal(res.data.meta?.total || normalized.length);
     } catch (err: unknown) {
       if (requestId !== requestIdRef.current) return;
-      const msg = err instanceof Error ? err.message : 'Gagal memuat pesan';
+      const msg = getApiErrorMessage(err, 'Gagal memuat pesan');
       setError(msg);
     } finally {
       if (requestId === requestIdRef.current && !silent) setIsLoading(false);
@@ -110,15 +111,14 @@ export function useMessages(eventId?: string): UseMessagesReturn {
   }, [eventId, fetchMessages]);
 
   const retryMessage = useCallback(async (messageId: string) => {
-    if (!eventId) throw new Error('Event aktif belum dipilih');
+    if (!eventId) throw new Error('Acara aktif belum dipilih');
     try {
       const response = await api.post<{ data: BackendMessage }>(`/messages/${messageId}/retry`);
       const retried = normalizeMessage(response.data.data);
       await fetchMessages(true);
       return retried;
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-      throw new Error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal mengirim ulang pesan');
+      throw new Error(getApiErrorMessage(err, 'Gagal mengirim ulang pesan'));
     }
   }, [eventId, fetchMessages]);
 

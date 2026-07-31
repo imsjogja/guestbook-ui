@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import api from '@/lib/api';
 import type { ApiResponse } from '@/types';
+import { getApiErrorMessage } from '@/lib/localization';
 
 export interface RSVPReminderCandidate {
   eventGuestId: string;
@@ -97,11 +98,6 @@ function normalizeResult(raw: BackendRSVPReminderResult): RSVPReminderSendResult
   };
 }
 
-function getErrorMessage(error: unknown, fallback: string): string {
-  const axiosError = error as { response?: { data?: { error?: string; message?: string } } };
-  return axiosError.response?.data?.error ?? axiosError.response?.data?.message ?? fallback;
-}
-
 export function useRSVPReminders(eventId?: string) {
   const [candidates, setCandidates] = useState<RSVPReminderCandidate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -124,7 +120,7 @@ export function useRSVPReminders(eventId?: string) {
       setCandidates(normalized);
       return normalized;
     } catch (err: unknown) {
-      const message = getErrorMessage(err, 'Gagal memuat kandidat pengingat RSVP');
+      const message = getApiErrorMessage(err, 'Gagal memuat kandidat pengingat RSVP');
       setError(message);
       throw new Error(message);
     } finally {
@@ -134,7 +130,7 @@ export function useRSVPReminders(eventId?: string) {
 
   const sendReminders = useCallback(
     async (templateId: string, guestIds: string[] = []) => {
-      if (!eventId) throw new Error('Event aktif belum dipilih');
+      if (!eventId) throw new Error('Acara aktif belum dipilih');
       if (!templateId) throw new Error('Template pengingat belum dipilih');
 
       try {
@@ -146,7 +142,7 @@ export function useRSVPReminders(eventId?: string) {
         await fetchCandidates();
         return result;
       } catch (err: unknown) {
-        throw new Error(getErrorMessage(err, 'Gagal mengirim pengingat RSVP'));
+        throw new Error(getApiErrorMessage(err, 'Gagal mengirim pengingat RSVP'));
       }
     },
     [eventId, fetchCandidates]

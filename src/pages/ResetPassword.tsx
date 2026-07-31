@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Lock, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
+import { getApiErrorMessage } from '@/lib/localization';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -23,8 +24,7 @@ export default function ResetPassword() {
       await api.post('/auth/reset-password', { token: searchParams.get('token'), password });
       setMessage('Kata sandi berhasil diubah. Silakan masuk dengan kata sandi baru.');
     } catch (err: unknown) {
-      const response = err as { response?: { data?: { message?: string } } };
-      setError(response.response?.data?.message ?? 'Link reset tidak valid atau sudah kedaluwarsa.');
+      setError(getApiErrorMessage(err, 'Link reset tidak valid atau sudah kedaluwarsa.'));
     } finally {
       setLoading(false);
     }

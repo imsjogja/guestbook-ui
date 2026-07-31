@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { TeamMember, ApiResponse, User, Permission, TenantRole } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
+import { getApiErrorMessage } from '@/lib/localization';
 
 export type TeamRole = TenantRole;
 
@@ -38,13 +39,6 @@ export interface UseTeamReturn {
 }
 
 const emptyPermissions: Permission[] = [];
-
-function getApiError(err: unknown, fallback: string): string {
-  const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-  return axiosErr.response?.data?.error
-    ?? axiosErr.response?.data?.message
-    ?? (err instanceof Error ? err.message : fallback);
-}
 
 function mapUser(user: BackendTeamMember['user'], role: TeamRole): User {
   const userRole: User['role'] =
@@ -121,7 +115,7 @@ export function useTeam(): UseTeamReturn {
       const data = res.data.data || [];
       setMembers(data.map(mapMember));
     } catch (err: unknown) {
-      setError(getApiError(err, 'Gagal memuat anggota tim'));
+      setError(getApiErrorMessage(err, 'Gagal memuat anggota tim'));
     } finally {
       setIsLoading(false);
     }
@@ -149,7 +143,7 @@ export function useTeam(): UseTeamReturn {
         await fetchMembers();
         return true;
       } catch (err: unknown) {
-        const msg = getApiError(err, 'Gagal menambahkan anggota');
+        const msg = getApiErrorMessage(err, 'Gagal menambahkan anggota');
         setError(msg);
         throw new Error(msg);
       }
@@ -169,7 +163,7 @@ export function useTeam(): UseTeamReturn {
         await fetchMembers();
         return true;
       } catch (err: unknown) {
-        const msg = getApiError(err, 'Gagal memperbarui peran');
+        const msg = getApiErrorMessage(err, 'Gagal memperbarui peran');
         setError(msg);
         throw new Error(msg);
       }
@@ -189,7 +183,7 @@ export function useTeam(): UseTeamReturn {
         await fetchMembers();
         return true;
       } catch (err: unknown) {
-        const msg = getApiError(err, 'Gagal menghapus anggota');
+        const msg = getApiErrorMessage(err, 'Gagal menghapus anggota');
         setError(msg);
         throw new Error(msg);
       }

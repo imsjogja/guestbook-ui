@@ -43,6 +43,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import type { TeamMember, TenantRole } from '@/types';
+import { getRoleLabel, getApiErrorMessage } from '@/lib/localization';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -60,7 +61,7 @@ const allRoles: TenantRole[] = ['tenant_owner', ...roleOptions];
 
 const roleConfig: Record<TenantRole, { label: string; description: string; className: string; icon: React.ReactNode; can: string[]; cannot: string[] }> = {
   tenant_owner: {
-    label: 'Tenant Owner',
+    label: getRoleLabel('tenant_owner'),
     description: 'Pemilik workspace dengan akses penuh.',
     className: 'bg-[#4f46e5] text-white',
     icon: <Crown size={10} />,
@@ -68,7 +69,7 @@ const roleConfig: Record<TenantRole, { label: string; description: string; class
     cannot: [],
   },
   event_manager: {
-    label: 'Event Manager',
+    label: getRoleLabel('event_manager'),
     description: 'Mengelola acara dan seluruh operasional acara.',
     className: 'bg-[#6366f1] text-white',
     icon: <Shield size={10} />,
@@ -76,7 +77,7 @@ const roleConfig: Record<TenantRole, { label: string; description: string; class
     cannot: ['Mengelola anggota tenant'],
   },
   rsvp_officer: {
-    label: 'RSVP Officer',
+    label: getRoleLabel('rsvp_officer'),
     description: 'Mengelola undangan, RSVP, dan komunikasi tamu.',
     className: 'bg-[#0ea5e9] text-white',
     icon: <ClipboardCheck size={10} />,
@@ -84,15 +85,15 @@ const roleConfig: Record<TenantRole, { label: string; description: string; class
     cannot: ['Mengelola check-in dan seating'],
   },
   registration_officer: {
-    label: 'Registration Officer',
+    label: getRoleLabel('registration_officer'),
     description: 'Menangani registrasi dan proses check-in.',
     className: 'bg-[#10b981] text-white',
     icon: <ScanLine size={10} />,
-    can: ['Melihat dan mengelola tamu', 'Memproses check-in dan walk-in'],
+    can: ['Melihat dan mengelola tamu', 'Memproses check-in dan tamu langsung'],
     cannot: ['Mengelola undangan dan RSVP'],
   },
   usher: {
-    label: 'Usher',
+    label: getRoleLabel('usher'),
     description: 'Membantu kedatangan tamu dan penempatan tempat duduk.',
     className: 'bg-[#14b8a6] text-white',
     icon: <UserCog size={10} />,
@@ -100,7 +101,7 @@ const roleConfig: Record<TenantRole, { label: string; description: string; class
     cannot: ['Mengubah data tamu dan undangan'],
   },
   gift_officer: {
-    label: 'Gift Officer',
+    label: getRoleLabel('gift_officer'),
     description: 'Menangani penerimaan hadiah dan souvenir.',
     className: 'bg-[#f59e0b] text-white',
     icon: <Gift size={10} />,
@@ -108,7 +109,7 @@ const roleConfig: Record<TenantRole, { label: string; description: string; class
     cannot: ['Mengelola check-in, RSVP, dan undangan'],
   },
   viewer: {
-    label: 'Viewer',
+    label: getRoleLabel('viewer'),
     description: 'Akses baca untuk pemantauan dan laporan.',
     className: 'bg-[#64748b] text-white',
     icon: <Eye size={10} />,
@@ -156,7 +157,7 @@ export default function Tim() {
       return false;
     }
     if (!canManageTeam) {
-      toast.error('Hanya Tenant Owner yang dapat mengubah anggota dan peran tenant');
+      toast.error('Hanya Pemilik tenant yang dapat mengubah anggota dan peran tenant');
       return false;
     }
     return true;
@@ -182,7 +183,7 @@ export default function Tim() {
       return;
     }
     if (memberPassword.length < 8) {
-      toast.error('Password minimal 8 karakter');
+      toast.error('Kata sandi minimal 8 karakter');
       return;
     }
     setIsSubmitting(true);
@@ -210,7 +211,7 @@ export default function Tim() {
         toast.error('Gagal menambahkan anggota');
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal menambahkan anggota');
+      toast.error(getApiErrorMessage(err, 'Gagal menambahkan anggota'));
     } finally {
       setIsSubmitting(false);
     }
@@ -219,7 +220,7 @@ export default function Tim() {
   const handleDelete = async (member: TeamMember) => {
     if (!ensureCanManageTeam()) return;
     if (member.role === 'tenant_owner') {
-      toast.error('Peran Tenant Owner tidak dapat dihapus');
+      toast.error('Peran Pemilik tenant tidak dapat dihapus');
       return;
     }
     if (!window.confirm(`Nonaktifkan akses ${member.user?.fullName || member.user?.email || 'anggota ini'}?`)) {
@@ -232,14 +233,14 @@ export default function Tim() {
         toast.success('Akses anggota berhasil dinonaktifkan');
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal menonaktifkan anggota');
+      toast.error(getApiErrorMessage(err, 'Gagal menonaktifkan anggota'));
     }
   };
 
   const openEditRole = (member: TeamMember) => {
     if (!ensureCanManageTeam()) return;
     if (member.role === 'tenant_owner') {
-      toast.info('Peran Tenant Owner tidak dapat diubah');
+      toast.info('Peran Pemilik tenant tidak dapat diubah');
       return;
     }
     setEditingMember(member);
@@ -252,7 +253,7 @@ export default function Tim() {
     setIsSubmitting(true);
     try {
       if (editingMember.role === 'tenant_owner') {
-        toast.error('Peran Tenant Owner tidak dapat dipilih');
+        toast.error('Peran Pemilik tenant tidak dapat dipilih');
         return;
       }
       const success = await updateRole(editingMember.id, editingMember.role);
@@ -263,7 +264,7 @@ export default function Tim() {
         toast.error('Gagal memperbarui peran');
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal memperbarui peran');
+      toast.error(getApiErrorMessage(err, 'Gagal memperbarui peran'));
     } finally {
       setIsSubmitting(false);
     }
@@ -315,7 +316,7 @@ export default function Tim() {
       {!isLoadingAccess && !canManageTeam && (
         <div className="flex items-start gap-3 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
           <AlertTriangle size={17} className="mt-0.5 shrink-0" />
-          <p>Anda dapat melihat anggota dan katalog peran. Hanya Tenant Owner yang dapat mengundang anggota, mengubah peran, atau menonaktifkan akses.</p>
+          <p>Anda dapat melihat anggota dan katalog peran. Hanya Pemilik tenant yang dapat menambahkan anggota, mengubah peran, atau menonaktifkan akses.</p>
         </div>
       )}
 
@@ -326,7 +327,7 @@ export default function Tim() {
           { label: 'Manajemen', value: stats.management, icon: <Shield size={16} />, color: 'text-[#6366f1]', bg: 'bg-[#eef2ff]' },
           { label: 'RSVP', value: stats.rsvp, icon: <ClipboardCheck size={16} />, color: 'text-[#0284c7]', bg: 'bg-[#e0f2fe]' },
           { label: 'Operasional', value: stats.operational, icon: <ScanLine size={16} />, color: 'text-[#10b981]', bg: 'bg-[#d1fae5]' },
-          { label: 'Viewer', value: stats.viewer, icon: <Eye size={16} />, color: 'text-[#f59e0b]', bg: 'bg-[#fef3c7]' },
+          { label: getRoleLabel('viewer'), value: stats.viewer, icon: <Eye size={16} />, color: 'text-[#f59e0b]', bg: 'bg-[#fef3c7]' },
           { label: 'Menunggu', value: stats.pending, icon: <Clock size={16} />, color: 'text-[#94a3b8]', bg: 'bg-[#f1f5f9]' },
         ].map((stat, i) => (
           <motion.div
@@ -440,7 +441,7 @@ export default function Tim() {
                               onClick={() => openEditRole(member)}
                               disabled={isLoadingAccess || !canManageTeam || member.role === 'tenant_owner'}
                               className="p-1.5 rounded-md text-[#64748b] hover:text-[#4f46e5] hover:bg-[#eef2ff] transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#64748b]"
-                              title={member.role === 'tenant_owner' ? 'Role Tenant Owner tidak dapat diubah' : 'Ubah Peran'}
+                              title={member.role === 'tenant_owner' ? 'Peran Pemilik tenant tidak dapat diubah' : 'Ubah peran'}
                             >
                               <Shield size={14} />
                             </button>
@@ -588,7 +589,7 @@ export default function Tim() {
                 </div>
 
                 <div>
-                  <Label htmlFor="member-password">Password Awal <span className="text-[#f43f5e]">*</span></Label>
+                  <Label htmlFor="member-password">Kata Sandi Awal <span className="text-[#f43f5e]">*</span></Label>
                   <Input
                     id="member-password"
                     type="password"
@@ -675,7 +676,7 @@ export default function Tim() {
               <Label>Peran Baru</Label>
               {editingMember?.role === 'tenant_owner' ? (
                 <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3 text-sm text-[#64748b]">
-                  Peran Tenant Owner bersifat permanen dan tidak dapat diubah dari halaman ini.
+              Peran Pemilik tenant bersifat permanen dan tidak dapat diubah dari halaman ini.
                 </div>
               ) : (
                 <Select

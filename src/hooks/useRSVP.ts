@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { RSVP, RSVPBreakdown } from '@/types';
+import { getApiErrorMessage } from '@/lib/localization';
 
 interface ApiRSVP {
   id: string;
@@ -142,8 +143,7 @@ export function useRSVP(eventId?: string) {
       setRsvps((rsvpsRes.data.data ?? []).map(normalizeRSVP));
       setBreakdown(normalizeBreakdown(breakdownRes.data.data));
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      const msg = axiosErr.response?.data?.message ?? 'Gagal memuat RSVP';
+      const msg = getApiErrorMessage(err, 'Gagal memuat RSVP');
       setError(msg);
     } finally {
       if (!silent) setIsLoading(false);
@@ -160,7 +160,7 @@ export function useRSVP(eventId?: string) {
   const updateRSVP = useCallback(
     async (id: string, data: Partial<RSVP>) => {
       if (!eventId) {
-        throw new Error('Event aktif belum dipilih');
+        throw new Error('Acara aktif belum dipilih');
       }
 
       try {
@@ -169,8 +169,7 @@ export function useRSVP(eventId?: string) {
         setRsvps((prev) => prev.map((r) => (r.id === id ? updated : r)));
         return updated;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal memperbarui RSVP');
+        throw new Error(getApiErrorMessage(err, 'Gagal memperbarui RSVP'));
       }
     },
     [eventId]
@@ -179,7 +178,7 @@ export function useRSVP(eventId?: string) {
   const saveRSVPForGuest = useCallback(
     async (guestId: string, data: Partial<RSVP>) => {
       if (!eventId) {
-        throw new Error('Event aktif belum dipilih');
+        throw new Error('Acara aktif belum dipilih');
       }
 
       try {
@@ -194,8 +193,7 @@ export function useRSVP(eventId?: string) {
         });
         return updated;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal menyimpan RSVP');
+        throw new Error(getApiErrorMessage(err, 'Gagal menyimpan RSVP'));
       }
     },
     [eventId]

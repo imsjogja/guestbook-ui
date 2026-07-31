@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { Template, ApiResponse } from '@/types';
 import { normalizeTemplate, type BackendTemplate } from '@/lib/normalizers';
+import { getApiErrorMessage } from '@/lib/localization';
 
 type TemplatePayload = {
   name?: string;
@@ -50,7 +51,7 @@ export function useTemplates(): UseTemplatesReturn {
       const res = await api.get<ApiResponse<BackendTemplate[]>>('/templates');
       setTemplates((res.data.data || []).map(normalizeTemplate));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memuat template';
+      const msg = getApiErrorMessage(err, 'Gagal memuat template');
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -68,7 +69,7 @@ export function useTemplates(): UseTemplatesReturn {
       setTemplates((prev) => [newTemplate, ...prev]);
       return newTemplate;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal membuat template';
+      const msg = getApiErrorMessage(err, 'Gagal membuat template');
       setError(msg);
       return null;
     }
@@ -81,7 +82,7 @@ export function useTemplates(): UseTemplatesReturn {
       setTemplates((prev) => prev.map((t) => (t.id === id ? updated : t)));
       return updated;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memperbarui template';
+      const msg = getApiErrorMessage(err, 'Gagal memperbarui template');
       setError(msg);
       return null;
     }
@@ -93,7 +94,7 @@ export function useTemplates(): UseTemplatesReturn {
       setTemplates((prev) => prev.filter((t) => t.id !== id));
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal menghapus template';
+      const msg = getApiErrorMessage(err, 'Gagal menghapus template');
       setError(msg);
       return false;
     }
@@ -106,7 +107,7 @@ export function useTemplates(): UseTemplatesReturn {
       setTemplates(generated);
       return generated;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal membuat template default';
+      const msg = getApiErrorMessage(err, 'Gagal membuat template default');
       setError(msg);
       return [];
     }

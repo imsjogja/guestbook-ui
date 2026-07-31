@@ -45,7 +45,7 @@ const navGroups: NavGroup[] = [
       { label: 'Dasbor', path: '/', icon: <LayoutDashboard size={20} />, permission: 'report:read' },
       { label: 'Acara', path: '/acara', icon: <CalendarDays size={20} />, permission: 'event:read' },
       { label: 'Tamu', path: '/tamu', icon: <Users size={20} />, permission: 'guest:read' },
-      { label: 'Gift & Angpau', path: '/gift', icon: <Gift size={20} />, permission: 'gift:read' },
+      { label: 'Hadiah & Angpau', path: '/gift', icon: <Gift size={20} />, permission: 'gift:read' },
       { label: 'Kelompok Keluarga', path: '/kelompok-keluarga', icon: <UserCircle size={20} />, permission: 'guest:read' },
     ],
   },

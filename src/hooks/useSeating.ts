@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { Table, ApiResponse } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
+import { getApiErrorMessage } from '@/lib/localization';
 
 type BackendAssignedGuest = {
   guest_id: string;
@@ -76,7 +77,7 @@ export function useSeating(): UseSeatingReturn {
       const nextTables = (res.data.data?.tables ?? []).map(normalizeTable);
       setTables(nextTables);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memuat data seating';
+      const msg = getApiErrorMessage(err, 'Gagal memuat data tempat duduk');
       setError(msg);
     } finally {
       if (!silent) setIsLoading(false);
@@ -92,7 +93,7 @@ export function useSeating(): UseSeatingReturn {
 
   const createTable = useCallback(async (data: Partial<Table>): Promise<Table | null> => {
     if (!currentEventId) {
-      const msg = 'Event aktif belum dipilih';
+      const msg = 'Acara aktif belum dipilih';
       setError(msg);
       return null;
     }
@@ -106,7 +107,7 @@ export function useSeating(): UseSeatingReturn {
       setTables((prev) => [...prev, newTable]);
       return newTable;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal membuat meja';
+      const msg = getApiErrorMessage(err, 'Gagal membuat meja');
       setError(msg);
       return null;
     }
@@ -114,7 +115,7 @@ export function useSeating(): UseSeatingReturn {
 
   const updateTable = useCallback(async (id: string, data: Partial<Table>): Promise<Table | null> => {
     if (!currentEventId) {
-      const msg = 'Event aktif belum dipilih';
+      const msg = 'Acara aktif belum dipilih';
       setError(msg);
       return null;
     }
@@ -138,7 +139,7 @@ export function useSeating(): UseSeatingReturn {
       );
       return returnedTable;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memperbarui meja';
+      const msg = getApiErrorMessage(err, 'Gagal memperbarui meja');
       setError(msg);
       return null;
     }
@@ -146,7 +147,7 @@ export function useSeating(): UseSeatingReturn {
 
   const deleteTable = useCallback(async (id: string): Promise<boolean> => {
     if (!currentEventId) {
-      const msg = 'Event aktif belum dipilih';
+      const msg = 'Acara aktif belum dipilih';
       setError(msg);
       return false;
     }
@@ -156,7 +157,7 @@ export function useSeating(): UseSeatingReturn {
       setTables((prev) => prev.filter((t) => t.id !== id));
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal menghapus meja';
+      const msg = getApiErrorMessage(err, 'Gagal menghapus meja');
       setError(msg);
       return false;
     }
@@ -164,7 +165,7 @@ export function useSeating(): UseSeatingReturn {
 
   const assignGuest = useCallback(async (tableId: string, guestId: string): Promise<boolean> => {
     if (!currentEventId) {
-      const msg = 'Event aktif belum dipilih';
+      const msg = 'Acara aktif belum dipilih';
       setError(msg);
       return false;
     }
@@ -185,7 +186,7 @@ export function useSeating(): UseSeatingReturn {
       );
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal menempatkan tamu';
+      const msg = getApiErrorMessage(err, 'Gagal menempatkan tamu');
       setError(msg);
       return false;
     }
@@ -193,7 +194,7 @@ export function useSeating(): UseSeatingReturn {
 
   const unassignGuest = useCallback(async (tableId: string, guestId: string): Promise<boolean> => {
     if (!currentEventId) {
-      const msg = 'Event aktif belum dipilih';
+      const msg = 'Acara aktif belum dipilih';
       setError(msg);
       return false;
     }
@@ -209,7 +210,7 @@ export function useSeating(): UseSeatingReturn {
       );
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memindahkan tamu';
+      const msg = getApiErrorMessage(err, 'Gagal memindahkan tamu');
       setError(msg);
       return false;
     }
@@ -217,7 +218,7 @@ export function useSeating(): UseSeatingReturn {
 
   const autoAssign = useCallback(async (eventId: string): Promise<boolean> => {
     if (!currentEventId) {
-      const msg = 'Event aktif belum dipilih';
+      const msg = 'Acara aktif belum dipilih';
       setError(msg);
       return false;
     }
@@ -227,7 +228,7 @@ export function useSeating(): UseSeatingReturn {
       await fetchTables();
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal auto-assign';
+      const msg = getApiErrorMessage(err, 'Gagal menempatkan tamu otomatis');
       setError(msg);
       return false;
     }

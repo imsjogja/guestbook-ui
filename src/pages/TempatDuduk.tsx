@@ -346,7 +346,7 @@ export default function TempatDuduk() {
 
   const openCreateTable = () => {
     if (!currentEventId) {
-      toast.error('Event aktif belum dipilih');
+      toast.error('Acara aktif belum dipilih');
       return;
     }
 
@@ -358,7 +358,7 @@ export default function TempatDuduk() {
 
   const handleCreateTable = async () => {
     if (!currentEventId) {
-      toast.error('Event aktif belum dipilih');
+      toast.error('Acara aktif belum dipilih');
       return;
     }
 
@@ -861,7 +861,7 @@ export default function TempatDuduk() {
               Tambah Meja
             </DialogTitle>
             <DialogDescription>
-              Buat meja baru untuk event aktif sebelum melakukan penempatan tamu.
+              Buat meja baru untuk acara aktif sebelum melakukan penempatan tamu.
             </DialogDescription>
           </DialogHeader>
 

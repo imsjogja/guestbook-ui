@@ -26,25 +26,18 @@ import type { Event } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
 import { QRCodeSVG, downloadQRCodeSvg } from '@/components/QRCodeSVG';
 import { useEventCheckinQR, useTenantAccess } from '@/hooks';
+import { getApiErrorMessage, getEventStatusLabel, getEventTypeLabel } from '@/lib/localization';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 /* ─── Status Config ─── */
 const statusConfig: Record<string, { label: string; bg: string; text: string; border: string; dot: string }> = {
-  draft: { label: 'Draft', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]', dot: '#94a3b8' },
+  draft: { label: 'Draf', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]', dot: '#94a3b8' },
   published: { label: 'Dipublikasikan', bg: 'bg-[#d1fae5]', text: 'text-[#059669]', border: 'border-[#a7f3d0]', dot: '#10b981' },
   archived: { label: 'Diarsipkan', bg: 'bg-[#f1f5f9]', text: 'text-[#64748b]', border: 'border-[#e2e8f0]', dot: '#94a3b8' },
   ongoing: { label: 'Sedang Berlangsung', bg: 'bg-[#fef3c7]', text: 'text-[#b45309]', border: 'border-[#fcd34d]', dot: '#f59e0b' },
   completed: { label: 'Selesai', bg: 'bg-[#dbeafe]', text: 'text-[#2563eb]', border: 'border-[#93c5fd]', dot: '#3b82f6' },
   cancelled: { label: 'Dibatalkan', bg: 'bg-[#ffe4e6]', text: 'text-[#e11d48]', border: 'border-[#fecdd3]', dot: '#f43f5e' },
-};
-
-const typeLabels: Record<string, string> = {
-  wedding: 'Pernikahan',
-  corporate: 'Korporat',
-  birthday: 'Ulang Tahun',
-  government: 'Pemerintahan',
-  other: 'Lainnya',
 };
 
 /* ─── Skeleton Row ─── */
@@ -135,7 +128,7 @@ export default function Acara() {
   /* ─── Handlers ─── */
   const openCreate = () => {
     if (!canWriteEvents) {
-      setErrorToast('Role Anda hanya dapat melihat acara. Minta Tenant Owner atau Event Manager untuk membuat acara.');
+      setErrorToast('Peran Anda hanya dapat melihat acara. Minta Pemilik tenant atau Manajer acara untuk membuat acara.');
       return;
     }
     setFormName('');
@@ -149,7 +142,7 @@ export default function Acara() {
 
   const openEdit = (evt: Event) => {
     if (!canWriteEvents) {
-      setErrorToast('Role Anda tidak memiliki akses untuk mengubah acara.');
+      setErrorToast('Peran Anda tidak memiliki akses untuk mengubah acara.');
       return;
     }
     setEditingEvent(evt);
@@ -165,7 +158,7 @@ export default function Acara() {
 
   const openDelete = (evt: Event) => {
     if (!canDeleteEvents) {
-      setErrorToast('Role Anda tidak memiliki akses untuk menghapus acara.');
+      setErrorToast('Peran Anda tidak memiliki akses untuk menghapus acara.');
       return;
     }
     setDeletingEvent(evt);
@@ -203,7 +196,7 @@ export default function Acara() {
       });
       setShowCreate(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal membuat acara';
+      const msg = getApiErrorMessage(err, 'Gagal membuat acara');
       setErrorToast(msg);
     } finally {
       setSubmitting(false);
@@ -226,7 +219,7 @@ export default function Acara() {
       setShowEdit(false);
       setEditingEvent(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memperbarui acara';
+      const msg = getApiErrorMessage(err, 'Gagal memperbarui acara');
       setErrorToast(msg);
     } finally {
       setSubmitting(false);
@@ -242,7 +235,7 @@ export default function Acara() {
       setShowDelete(false);
       setDeletingEvent(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal menghapus acara';
+      const msg = getApiErrorMessage(err, 'Gagal menghapus acara');
       setErrorToast(msg);
     } finally {
       setSubmitting(false);
@@ -251,7 +244,7 @@ export default function Acara() {
 
   const handleDuplicate = async (evt: Event) => {
     if (!canWriteEvents) {
-      setErrorToast('Role Anda tidak memiliki akses untuk menduplikat acara.');
+      setErrorToast('Peran Anda tidak memiliki akses untuk menduplikat acara.');
       return;
     }
     setErrorToast(null);
@@ -266,7 +259,7 @@ export default function Acara() {
       });
       setDropdownOpen(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal menduplikat acara';
+      const msg = getApiErrorMessage(err, 'Gagal menduplikat acara');
       setErrorToast(msg);
     }
   };
@@ -338,14 +331,14 @@ export default function Acara() {
             disabled={showCreate}
             className="w-full h-10 px-3 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/20 disabled:bg-[#f8fafc] disabled:text-[#94a3b8]"
           >
-            <option value="draft">Draft</option>
+            <option value="draft">Draf</option>
             <option value="published">Dipublikasikan</option>
             <option value="ongoing">Sedang Berlangsung</option>
             <option value="completed">Selesai</option>
             <option value="cancelled">Dibatalkan</option>
             <option value="archived">Diarsipkan</option>
           </select>
-          {showCreate && <p className="mt-1 text-[11px] text-[#94a3b8]">Acara baru dimulai sebagai Draft. Status dapat diubah setelah dibuat.</p>}
+          {showCreate && <p className="mt-1 text-[11px] text-[#94a3b8]">Acara baru dimulai sebagai Draf. Status dapat diubah setelah dibuat.</p>}
         </div>
       </div>
     </div>
@@ -382,7 +375,7 @@ export default function Acara() {
           <h1 className="text-2xl font-bold text-[#0f172a] dark:text-[#f8fafc]">Daftar Acara</h1>
           <p className="text-sm text-[#64748b] mt-0.5">Kelola semua acara dan detailnya</p>
           {!isLoadingAccess && !canWriteEvents && (
-            <p className="text-xs text-[#b45309] mt-2">Mode baca: pembuatan dan perubahan acara hanya tersedia untuk Tenant Owner atau Event Manager.</p>
+            <p className="text-xs text-[#b45309] mt-2">Mode baca: pembuatan dan perubahan acara hanya tersedia untuk Pemilik tenant atau Manajer acara.</p>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -426,7 +419,7 @@ export default function Acara() {
             className="h-10 pl-3 pr-8 rounded-lg border border-[#e2e8f0] bg-white text-sm focus:outline-none focus:border-[#4f46e5] appearance-none cursor-pointer"
           >
             <option value="all">Semua Status</option>
-            <option value="draft">Draft</option>
+            <option value="draft">Draf</option>
             <option value="published">Dipublikasikan</option>
             <option value="ongoing">Sedang Berlangsung</option>
             <option value="completed">Selesai</option>
@@ -514,7 +507,7 @@ export default function Acara() {
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-sm text-[#64748b]">{typeLabels[evt.eventType] || evt.eventType}</span>
+                            <span className="text-sm text-[#64748b]">{getEventTypeLabel(evt.eventType)}</span>
                           </td>
                           <td className="px-4 py-3">
                             <span className="text-sm text-[#0f172a] dark:text-[#f8fafc]">
@@ -533,7 +526,7 @@ export default function Acara() {
                           <td className="px-4 py-3">
                             <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border', s.bg, s.text, s.border)}>
                               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: s.dot }} />
-                              {s.label}
+                              {getEventStatusLabel(evt.status)}
                             </span>
                           </td>
                           <td className="px-4 py-3">

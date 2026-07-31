@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { getApiErrorMessage, getChannelLabel } from '@/lib/localization';
 import { downloadTextFile } from '@/lib/guest-csv';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
@@ -93,7 +94,7 @@ export default function RiwayatPesan() {
       const retried = await retryMessage(id);
       toast.success(retried.status === 'failed' ? 'Pengiriman ulang gagal' : 'Pesan dikirim ulang');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal mengirim ulang pesan');
+      toast.error(getApiErrorMessage(err, 'Gagal mengirim ulang pesan'));
     }
   };
 
@@ -213,7 +214,7 @@ export default function RiwayatPesan() {
         </div>
         <Select value={channelFilter} onValueChange={setChannelFilter}>
           <SelectTrigger className="w-[140px] h-10 border-[#e2e8f0] dark:border-[#334155]">
-            <SelectValue placeholder="Channel" />
+            <SelectValue placeholder="Saluran" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Semua</SelectItem>
@@ -260,7 +261,7 @@ export default function RiwayatPesan() {
             <table className="w-full">
               <thead>
                 <tr className="bg-[#f8fafc] dark:bg-[#1e293b]">
-                  {['Waktu', 'Channel', 'Isi Pesan', 'Status', 'Aksi'].map((h) => (
+                  {['Waktu', 'Saluran', 'Isi Pesan', 'Status', 'Aksi'].map((h) => (
                     <th
                       key={h}
                       className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#64748b]"
@@ -300,7 +301,7 @@ export default function RiwayatPesan() {
                                 msg.channel === 'whatsapp' ? 'bg-[#10b981]' : 'bg-[#3b82f6]'
                               )}
                             />
-                            <span className="text-[12px] text-[#64748b] capitalize">{msg.channel}</span>
+                            <span className="text-[12px] text-[#64748b]">{getChannelLabel(msg.channel)}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3 max-w-[400px]">
@@ -375,7 +376,7 @@ export default function RiwayatPesan() {
                       selectedMessage.channel === 'whatsapp' ? 'bg-[#10b981]' : 'bg-[#3b82f6]'
                     )}
                   />
-                  <span className="capitalize">{selectedMessage.channel}</span>
+                  <span>{getChannelLabel(selectedMessage.channel)}</span>
                   <span className="text-[#94a3b8]">|</span>
                   <span
                     className={cn(

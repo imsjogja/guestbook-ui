@@ -34,6 +34,7 @@ import { useCheckin } from '@/hooks/useCheckin';
 import { useEvents } from '@/hooks/useEvents';
 import { cn } from '@/lib/utils';
 import type { Activity } from '@/types';
+import { formatNumber } from '@/lib/localization';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -95,7 +96,7 @@ function useCountUp(target: number, duration = 800, delay = 0) {
 
 function formatCount(n: number | null | undefined) {
   const safe = typeof n === 'number' && Number.isFinite(n) ? n : 0;
-  return safe.toLocaleString('id-ID');
+  return formatNumber(safe);
 }
 
 function getRelativeTime(dateStr: string) {
@@ -134,7 +135,7 @@ function getEventStatusBadge(status: string) {
     case 'active':
       return { label: 'Dipublikasikan', className: 'bg-[#d1fae5] text-[#10b981] border-[#a7f3d0]' };
     case 'draft':
-      return { label: 'Draft', className: 'bg-[#fef3c7] text-[#f59e0b] border-[#fde68a]' };
+      return { label: 'Draf', className: 'bg-[#fef3c7] text-[#f59e0b] border-[#fde68a]' };
     case 'ongoing':
     case 'paused':
       return { label: 'Sedang Berlangsung', className: 'bg-[#fef3c7] text-[#b45309] border-[#fcd34d]' };

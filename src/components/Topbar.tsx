@@ -37,7 +37,7 @@ const breadcrumbMap: Record<string, { label: string; parent?: string }> = {
   '/acara': { label: 'Acara' },
   '/tamu': { label: 'Tamu' },
   '/tamu/:id': { label: 'Detail Tamu', parent: '/tamu' },
-  '/gift': { label: 'Gift & Angpau' },
+  '/gift': { label: 'Hadiah & Angpau' },
   '/kelompok-keluarga': { label: 'Kelompok Keluarga' },
   '/undangan': { label: 'Undangan' },
   '/rsvp': { label: 'RSVP' },

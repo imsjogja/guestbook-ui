@@ -3,6 +3,7 @@ import api from '@/lib/api';
 import type { Guest } from '@/types';
 import { normalizeGuest } from '@/lib/normalizers';
 import { buildGuestExportCsv, downloadBlobFile, downloadTextFile } from '@/lib/guest-csv';
+import { getApiErrorMessage } from '@/lib/localization';
 
 type BackendGuest = {
   id: string;
@@ -204,8 +205,7 @@ export function useGuests(eventId?: string, options?: { perPage?: number; all?: 
       setGuests(normalized);
       setTotal(firstPage.meta?.total ?? normalized.length);
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      const msg = axiosErr.response?.data?.message ?? 'Gagal memuat tamu';
+      const msg = getApiErrorMessage(err, 'Gagal memuat tamu');
       setError(msg);
     } finally {
       if (!silent) setIsLoading(false);
@@ -242,8 +242,7 @@ export function useGuests(eventId?: string, options?: { perPage?: number; all?: 
         setTotal((prev) => prev + 1);
         return newGuest;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal menambah tamu');
+        throw new Error(getApiErrorMessage(err, 'Gagal menambah tamu'));
       }
     },
     [eventId]
@@ -261,8 +260,7 @@ export function useGuests(eventId?: string, options?: { perPage?: number; all?: 
         setGuests((prev) => prev.map((g) => (g.id === id ? result : g)));
         return result;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal memperbarui tamu');
+        throw new Error(getApiErrorMessage(err, 'Gagal memperbarui tamu'));
       }
     },
     [eventId, guests]
@@ -275,8 +273,7 @@ export function useGuests(eventId?: string, options?: { perPage?: number; all?: 
         setGuests((prev) => prev.filter((g) => g.id !== id));
         setTotal((prev) => Math.max(0, prev - 1));
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal menghapus tamu');
+        throw new Error(getApiErrorMessage(err, 'Gagal menghapus tamu'));
       }
     },
     [eventId, guests]
@@ -294,8 +291,7 @@ export function useGuests(eventId?: string, options?: { perPage?: number; all?: 
         await fetchGuests();
         return response.data.data;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-        throw new Error(axiosErr.response?.data?.error ?? axiosErr.response?.data?.message ?? 'Gagal mengimpor CSV');
+        throw new Error(getApiErrorMessage(err, 'Gagal mengimpor CSV'));
       }
     },
     [eventId, fetchGuests]
@@ -306,8 +302,7 @@ export function useGuests(eventId?: string, options?: { perPage?: number; all?: 
       const response = await api.get('/guests/import/template', { responseType: 'blob' });
       downloadBlobFile('guest_import_template.csv', response.data as Blob);
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      throw new Error(axiosErr.response?.data?.message ?? 'Gagal mengunduh template CSV');
+        throw new Error(getApiErrorMessage(err, 'Gagal mengunduh template CSV'));
     }
   }, []);
 
@@ -341,8 +336,7 @@ export function useGuests(eventId?: string, options?: { perPage?: number; all?: 
       downloadTextFile(`guest_export_${new Date().toISOString().slice(0, 10)}.csv`, csv, 'text/csv;charset=utf-8');
       return allGuests.length;
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      throw new Error(axiosErr.response?.data?.message ?? 'Gagal mengekspor CSV');
+      throw new Error(getApiErrorMessage(err, 'Gagal mengekspor CSV'));
     }
   }, [eventId]);
 

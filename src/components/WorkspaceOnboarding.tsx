@@ -73,7 +73,7 @@ export default function WorkspaceOnboarding() {
               {[
                 'Tenant baru akan langsung dipilih sebagai workspace aktif.',
                 'Setelah itu Anda bisa membuat acara pertama dari menu Acara.',
-                'Barcode undangan, RSVP, check-in, dan seating akan aktif setelah event dibuat.',
+                'Barcode undangan, RSVP, check-in, dan tempat duduk akan aktif setelah acara dibuat.',
               ].map((item) => (
                 <div key={item} className="flex items-start gap-3">
                   <div className="mt-1 h-2 w-2 rounded-full bg-[#4f46e5]" />

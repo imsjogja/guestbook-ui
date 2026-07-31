@@ -6,6 +6,7 @@ import {
   type WhatsAppReadiness,
 } from '@/lib/whatsapp-onboarding';
 import { useTenantStore } from '@/store/tenantStore';
+import { getApiErrorMessage } from '@/lib/localization';
 
 type SendWhatsAppPayload = {
   guest_ids: string[];
@@ -25,22 +26,7 @@ export class WhatsAppOnboardingError extends Error {
 }
 
 function getErrorMessage(error: unknown): string {
-  if (typeof error === 'object' && error !== null && 'response' in error) {
-    const response = (error as { response?: { status?: number; data?: { error?: string; message?: string } } }).response;
-    const raw = response?.data?.error || response?.data?.message || '';
-    const normalized = raw.toLowerCase();
-    if (response?.status === 401 || normalized.includes('unauthorized') || normalized.includes('not logged')) {
-      return 'WhatsApp belum terhubung. Buka Pengaturan > Integrasi untuk menyelesaikan onboarding.';
-    }
-    if (normalized.includes('device') && normalized.includes('not found')) {
-      return 'Perangkat WhatsApp belum siap. Buka Pengaturan > Integrasi untuk menghubungkannya.';
-    }
-    if (normalized.includes('timeout') || normalized.includes('unavailable')) {
-      return 'Layanan WhatsApp sedang tidak tersedia. Coba lagi setelah beberapa saat.';
-    }
-    return raw || 'Gagal mengirim WhatsApp';
-  }
-  return error instanceof Error ? error.message : 'Gagal mengirim WhatsApp';
+  return getApiErrorMessage(error, 'Gagal mengirim WhatsApp');
 }
 
 export function useWhatsAppMessaging() {

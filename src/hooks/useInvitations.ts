@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { Invitation, ApiResponse } from '@/types';
 import { normalizeInvitation } from '@/lib/normalizers';
+import { getApiErrorMessage } from '@/lib/localization';
 
 type BackendInvitation = {
   id: string;
@@ -90,7 +91,7 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
       setInvitations((res.data.data || []).map(normalizeInvitationResponse));
       setError(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memuat data undangan';
+      const msg = getApiErrorMessage(err, 'Gagal memuat data undangan');
       // Keep the current table visible during a transient background refresh failure.
       if (!silent) setError(msg);
     } finally {
@@ -111,7 +112,7 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
 
   const createInvitation = useCallback(async (data: Partial<Invitation> & { guestId?: string; guestIds?: string[]; expiresAt?: string }): Promise<Invitation | null> => {
     if (!eventId) {
-      setError('Event aktif belum dipilih');
+      setError('Acara aktif belum dipilih');
       return null;
     }
 
@@ -121,7 +122,7 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
       setInvitations((prev) => [newInv, ...prev]);
       return newInv;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal membuat undangan';
+      const msg = getApiErrorMessage(err, 'Gagal membuat undangan');
       setError(msg);
       return null;
     }
@@ -129,7 +130,7 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
 
   const batchCreate = useCallback(async (guestIds: string[], _channel: string, _templateId?: string): Promise<Invitation[]> => {
     if (!eventId) {
-      setError('Event aktif belum dipilih');
+      setError('Acara aktif belum dipilih');
       return [];
     }
 
@@ -151,7 +152,7 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
       }
       return newInvs;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal membuat undangan massal';
+      const msg = getApiErrorMessage(err, 'Gagal membuat undangan massal');
       setError(msg);
       return [];
     }
@@ -159,7 +160,7 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
 
   const revokeInvitation = useCallback(async (id: string): Promise<boolean> => {
     if (!eventId) {
-      setError('Event aktif belum dipilih');
+      setError('Acara aktif belum dipilih');
       return false;
     }
 
@@ -168,7 +169,7 @@ export function useInvitations(eventId?: string): UseInvitationsReturn {
       setInvitations((prev) => prev.filter((inv) => inv.id !== id));
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal mencabut undangan';
+      const msg = getApiErrorMessage(err, 'Gagal mencabut undangan');
       setError(msg);
       return false;
     }

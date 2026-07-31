@@ -4,6 +4,7 @@ import { normalizeTenant, type BackendTenant } from '@/lib/workspace';
 import { useTenantStore } from '@/store/tenantStore';
 import type { ApiResponse, Tenant } from '@/types';
 import { bootstrapWorkspace } from '@/lib/workspace';
+import { getApiErrorMessage } from '@/lib/localization';
 
 type TenantCreatePayload = {
   name: string;
@@ -33,10 +34,7 @@ export function useTenants() {
 
       return tenant;
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string; error?: string } } };
-      const message = axiosErr.response?.data?.message
-        ?? axiosErr.response?.data?.error
-        ?? (err instanceof Error ? err.message : 'Gagal membuat tenant');
+      const message = getApiErrorMessage(err, 'Gagal membuat tenant');
       setError(message);
       throw new Error(message);
     } finally {

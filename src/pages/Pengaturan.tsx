@@ -38,6 +38,7 @@ import { toast } from 'sonner';
 import api from '@/lib/api';
 import { useSearchParams } from 'react-router-dom';
 import { getWhatsAppReadiness, type WhatsAppIntegrationStatus } from '@/lib/whatsapp-onboarding';
+import { getApiErrorMessage } from '@/lib/localization';
 
 
 
@@ -260,8 +261,7 @@ export default function Pengaturan() {
       setUser(response.data.user);
       toast.success('Profil berhasil disimpan');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menyimpan profil');
+      toast.error(getApiErrorMessage(err, 'Gagal menyimpan profil'));
     } finally {
       setIsSaving(false);
     }
@@ -293,8 +293,7 @@ export default function Pengaturan() {
       toast.success('Kata sandi berhasil diperbarui. Silakan masuk kembali.');
       logout();
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal memperbarui kata sandi');
+      toast.error(getApiErrorMessage(err, 'Gagal memperbarui kata sandi'));
     } finally {
       setIsSaving(false);
     }
@@ -322,8 +321,7 @@ export default function Pengaturan() {
       setTenant(response.data.data);
       toast.success('Pengaturan tenant berhasil disimpan');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menyimpan pengaturan tenant');
+      toast.error(getApiErrorMessage(err, 'Gagal menyimpan pengaturan tenant'));
     } finally {
       setIsSaving(false);
     }
@@ -358,8 +356,7 @@ export default function Pengaturan() {
       setTenant(response.data.data);
       toast.success('Preferensi notifikasi berhasil disimpan');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menyimpan preferensi notifikasi');
+      toast.error(getApiErrorMessage(err, 'Gagal menyimpan preferensi notifikasi'));
     } finally {
       setIsSaving(false);
     }
@@ -374,8 +371,7 @@ export default function Pengaturan() {
       setWhatsappStatus(response.data.data);
       toast.success('Pengaturan WhatsApp disimpan dan langsung diterapkan');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menyimpan pengaturan WhatsApp');
+      toast.error(getApiErrorMessage(err, 'Gagal menyimpan pengaturan WhatsApp'));
     } finally {
       setIsSaving(false);
     }
@@ -397,8 +393,7 @@ export default function Pengaturan() {
       });
       toast.success('QR pairing siap dipindai dari WhatsApp');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal menghubungkan WhatsApp');
+      toast.error(getApiErrorMessage(err, 'Gagal menghubungkan WhatsApp'));
     } finally {
       setWhatsappPairing(false);
     }
@@ -423,8 +418,7 @@ export default function Pengaturan() {
       setWhatsappTestResult(response.data.data);
       toast.success('Pesan uji berhasil dikirim');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Pesan uji gagal dikirim');
+      toast.error(getApiErrorMessage(err, 'Pesan uji gagal dikirim'));
     } finally {
       setWhatsappTestSending(false);
     }
@@ -442,8 +436,7 @@ export default function Pengaturan() {
       });
       toast.success('Perangkat WhatsApp berhasil logout');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } };
-      toast.error(axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Gagal logout perangkat WhatsApp');
+      toast.error(getApiErrorMessage(err, 'Gagal logout perangkat WhatsApp'));
     } finally {
       setWhatsappLoggingOut(false);
     }
@@ -757,7 +750,7 @@ export default function Pengaturan() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Pernikahan">Pernikahan</SelectItem>
-                          <SelectItem value="Event">Event</SelectItem>
+                          <SelectItem value="Event">Acara</SelectItem>
                           <SelectItem value="Korporat">Korporat</SelectItem>
                           <SelectItem value="Pemerintah">Pemerintah</SelectItem>
                           <SelectItem value="Lainnya">Lainnya</SelectItem>

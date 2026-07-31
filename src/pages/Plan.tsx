@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { Check, Loader2, CreditCard, Receipt } from 'lucide-react';
 import { usePlans, useSubscription, initiateCheckout, usePaymentHistory } from '@/hooks/useSubscription';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { getApiErrorMessage, formatNumber } from '@/lib/localization';
 
 // Midtrans Snap global types
 declare global {
@@ -71,18 +73,18 @@ export default function Plan() {
           },
           onError: (result: any) => {
             console.error('Payment error:', result);
-            alert('Pembayaran gagal atau dibatalkan.');
+            toast.error('Pembayaran gagal atau dibatalkan.');
           },
           onClose: () => {
             console.log('Payment popup closed');
           }
         });
       } else {
-        alert('Payment gateway failed to load. Please refresh the page.');
+        toast.error('Layanan pembayaran belum siap. Muat ulang halaman lalu coba lagi.');
       }
     } catch (err: any) {
       console.error('Checkout failed', err);
-      alert(err.response?.data?.message || 'Gagal memulai pembayaran.');
+      toast.error(getApiErrorMessage(err, 'Gagal memulai pembayaran.'));
     } finally {
       setIsProcessing(null);
     }
@@ -98,10 +100,10 @@ export default function Plan() {
           Paket & Penagihan
         </div>
         <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4">
-          Pilih Paket yang Sesuai untuk Event Anda
+          Pilih Paket yang Sesuai untuk Acara Anda
         </h2>
         <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
-          Mulai dari event kecil hingga berskala masif, kami punya paket yang pas untuk kebutuhan Anda.
+          Mulai dari acara kecil hingga berskala besar, kami punya paket yang sesuai untuk kebutuhan Anda.
         </p>
 
         {status && (
@@ -195,13 +197,13 @@ export default function Plan() {
                 </h3>
                 <div className="flex items-baseline gap-1">
                   <span className="text-4xl font-extrabold text-slate-900 dark:text-white">
-                    Rp {Math.round(plan.price_idr / (billingCycle === 'yearly' ? 12 : 1)).toLocaleString('id-ID')}
+                    Rp {formatNumber(Math.round(plan.price_idr / (billingCycle === 'yearly' ? 12 : 1)))}
                   </span>
                   <span className="text-slate-500 dark:text-slate-400 font-medium">/bulan</span>
                 </div>
                 {billingCycle === 'yearly' && (
                   <p className="text-sm text-emerald-600 font-medium mt-2">
-                    Ditagih Rp {plan.price_idr.toLocaleString('id-ID')} per tahun
+                    Ditagih Rp {formatNumber(plan.price_idr)} per tahun
                   </p>
                 )}
               </div>
@@ -209,15 +211,15 @@ export default function Plan() {
               <div className="flex-1">
                 <ul className="space-y-4">
                   <FeatureItem
-                    text={plan.max_events === null ? 'Event Tidak Terbatas' : `Maks. ${plan.max_events} Event`}
+                    text={plan.max_events === null ? 'Acara tidak terbatas' : `Maks. ${plan.max_events} acara`}
                     included={true}
                   />
                   <FeatureItem
-                    text={plan.max_guests === null ? 'Tamu Tidak Terbatas' : `Maks. ${plan.max_guests} Tamu per Event`}
+                    text={plan.max_guests === null ? 'Tamu tidak terbatas' : `Maks. ${plan.max_guests} tamu per acara`}
                     included={true}
                   />
                   <FeatureItem
-                    text={plan.max_team_members === null ? 'Anggota Tim Tidak Terbatas' : `Maks. ${plan.max_team_members} Anggota Tim`}
+                    text={plan.max_team_members === null ? 'Anggota tim tidak terbatas' : `Maks. ${plan.max_team_members} anggota tim`}
                     included={true}
                   />
                   <FeatureItem
@@ -268,7 +270,7 @@ export default function Plan() {
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-500 via-transparent to-transparent"></div>
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 max-w-5xl mx-auto">
           <div className="text-left flex-1">
-            <h3 className="text-2xl font-bold text-white mb-2">Butuh solusi untuk Agency atau Event berskala masif?</h3>
+            <h3 className="text-2xl font-bold text-white mb-2">Butuh solusi untuk agensi atau acara berskala besar?</h3>
             <p className="text-slate-300 text-sm">Hubungi tim sales kami untuk paket kustom, dedicated account manager, dan SLA support.</p>
           </div>
           <button className="flex-shrink-0 bg-white text-slate-900 hover:bg-slate-100 px-8 py-3.5 rounded-xl font-bold transition-colors text-sm">

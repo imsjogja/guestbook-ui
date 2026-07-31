@@ -31,6 +31,7 @@ import { useEventAccess, useGuestDetail, useInvitations, useRSVP, useTemplates, 
 import { useTenantStore } from '@/store/tenantStore';
 import { toast } from 'sonner';
 import type { Template } from '@/types';
+import { getApiErrorMessage } from '@/lib/localization';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -80,7 +81,7 @@ const rsvpConfig: Record<string, { label: string; bg: string; text: string; bord
 const deliveryStatusLabels: Record<string, string> = {
   not_sent: 'Belum Dikirim',
   queued: 'Dalam Antrean',
-  sent: 'Diterima Provider',
+  sent: 'Diterima provider',
   delivered: 'Tersampaikan',
   read: 'Dibaca',
   failed: 'Gagal',
@@ -89,13 +90,13 @@ const deliveryStatusLabels: Record<string, string> = {
 function getCheckinMethodLabel(method: string): string {
   if (method === 'self_service' || method === 'kiosk') return 'Mandiri';
   if (method === 'qr' || method === 'qr_scan') return 'Scan QR';
-  if (method === 'manual' || method === 'manual_search') return 'Manual';
-  if (method === 'walk_in') return 'Walk-in';
+  if (method === 'manual' || method === 'manual_search') return 'Pencarian manual';
+  if (method === 'walk_in') return 'Tamu langsung';
   return method || '-';
 }
 
 const invitationStatusLabels: Record<string, string> = {
-  draft: 'Draft',
+  draft: 'Draf',
   opened: 'Dibuka',
   responded: 'Sudah RSVP',
   expired: 'Kedaluwarsa',
@@ -179,13 +180,13 @@ export default function TamuDetail() {
     [templates]
   );
   const roleLabel: Record<string, string> = {
-    tenant_owner: 'Tenant Owner',
-    event_manager: 'Event Manager',
-    rsvp_officer: 'RSVP Officer',
-    registration_officer: 'Registration Officer',
-    usher: 'Usher',
-    gift_officer: 'Gift Officer',
-    viewer: 'Viewer',
+    tenant_owner: 'Pemilik tenant',
+    event_manager: 'Manajer acara',
+    rsvp_officer: 'Petugas RSVP',
+    registration_officer: 'Petugas registrasi',
+    usher: 'Petugas penerima tamu',
+    gift_officer: 'Petugas hadiah',
+    viewer: 'Pengamat',
   };
 
   const openRsvpEdit = () => {
@@ -219,7 +220,7 @@ export default function TamuDetail() {
       toast.success(saved ? 'Status RSVP disimpan' : 'Status RSVP diperbarui');
       setShowRsvpEdit(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memperbarui RSVP';
+      const msg = getApiErrorMessage(err, 'Gagal memperbarui RSVP');
       toast.error(msg);
     } finally {
       setIsSavingRsvp(false);
@@ -264,7 +265,7 @@ export default function TamuDetail() {
       return;
     }
     if (!canWriteInvitations) {
-      toast.error('Role Anda tidak memiliki akses untuk membuat undangan');
+      toast.error('Peran Anda tidak memiliki akses untuk membuat undangan');
       return;
     }
     setIsCreatingInvitation(true);
@@ -276,7 +277,7 @@ export default function TamuDetail() {
         toast.error('Gagal membuat undangan. Pastikan tamu terdaftar pada acara aktif dan role memiliki akses.');
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal membuat undangan';
+      const msg = getApiErrorMessage(err, 'Gagal membuat undangan');
       toast.error(msg);
     } finally {
       setIsCreatingInvitation(false);
@@ -291,7 +292,7 @@ export default function TamuDetail() {
     try {
       await ensureReady();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'WhatsApp belum siap digunakan');
+      toast.error(getApiErrorMessage(err, 'WhatsApp belum siap digunakan'));
       return;
     }
     setSelectedWhatsAppTemplate(whatsappTemplates[0]?.id || '');
@@ -305,7 +306,7 @@ export default function TamuDetail() {
       toast.success('WhatsApp berhasil dikirim');
       setIsWhatsAppModalOpen(false);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal mengirim WhatsApp');
+      toast.error(getApiErrorMessage(err, 'Gagal mengirim WhatsApp'));
     }
   };
 
@@ -687,10 +688,10 @@ export default function TamuDetail() {
                     <div>
                       <p className="text-sm font-medium text-[#9a3412] dark:text-[#fdba74]">Akses undangan tidak tersedia</p>
                       <p className="text-xs text-[#c2410c] dark:text-[#fdba74] mt-1">
-                        Role {roleLabel[access?.role || ''] || 'Anda'} tidak memiliki izin untuk membaca atau membuat undangan pada acara ini.
+                        Peran {roleLabel[access?.role || ''] || 'Anda'} tidak memiliki izin untuk membaca atau membuat undangan pada acara ini.
                       </p>
                       <p className="text-xs text-[#c2410c] dark:text-[#fdba74] mt-2">
-                        Gunakan RSVP Officer, Event Manager, atau Tenant Owner untuk mengelola undangan.
+                        Gunakan Petugas RSVP, Manajer acara, atau Pemilik tenant untuk mengelola undangan.
                       </p>
                     </div>
                   </div>
@@ -713,12 +714,12 @@ export default function TamuDetail() {
                       </span>
                       {invitation.deliveryProviderHttpStatus && (
                         <p className="mt-1 text-[11px] text-[#94a3b8]">
-                          Bukti provider: HTTP {invitation.deliveryProviderHttpStatus}
+                          Bukti respons layanan: HTTP {invitation.deliveryProviderHttpStatus}
                         </p>
                       )}
                       {invitation.deliveryStatus === 'sent' && !invitation.deliveryProviderHttpStatus && (
                         <p className="mt-1 text-[11px] text-[#b45309]">
-                          Receipt provider belum tercatat pada data lama
+                          Bukti respons layanan belum tercatat pada data lama
                         </p>
                       )}
                       {invitation.deliveryErrorMessage && (
@@ -826,7 +827,7 @@ export default function TamuDetail() {
                   <div className="w-full rounded-xl border border-dashed border-[#e2e8f0] bg-[#f8fafc] dark:bg-[#1e293b] py-10 px-5 text-center">
                     <QrCode size={40} className="mx-auto text-[#94a3b8] mb-3" />
                     <p className="text-sm font-medium text-[#475569] dark:text-[#cbd5e1]">Belum ada undangan</p>
-                    <p className="text-xs text-[#64748b] mt-1">Role Anda hanya dapat membaca data. Minta RSVP Officer atau Event Manager membuat undangan.</p>
+                    <p className="text-xs text-[#64748b] mt-1">Peran Anda hanya dapat membaca data. Minta Petugas RSVP atau Manajer acara membuat undangan.</p>
                   </div>
                 )}
               </div>
@@ -939,7 +940,7 @@ export default function TamuDetail() {
                 </select>
               </div>
               <p className="text-xs text-[#94a3b8]">
-                Perubahan ini akan disimpan ke data RSVP event aktif.
+                Perubahan ini akan disimpan ke data RSVP acara aktif.
               </p>
             </div>
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#e2e8f0] dark:border-[#334155]">
@@ -971,7 +972,7 @@ export default function TamuDetail() {
           <DialogHeader>
             <DialogTitle>Kirim WhatsApp</DialogTitle>
             <DialogDescription>
-              Kirim pesan ke {guest?.fullName || 'tamu'} melalui provider WhatsApp yang terhubung.
+              Kirim pesan ke {guest?.fullName || 'tamu'} melalui layanan WhatsApp yang terhubung.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">

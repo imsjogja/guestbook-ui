@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/localization';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -172,8 +173,8 @@ export default function TemplateKomunikasi() {
       }
       setIsCreateOpen(false);
       resetForm();
-    } catch {
-      toast.error(editingTemplate ? 'Gagal memperbarui template' : 'Gagal membuat template');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, editingTemplate ? 'Gagal memperbarui template' : 'Gagal membuat template'));
     } finally {
       setIsSubmitting(false);
     }
@@ -189,8 +190,8 @@ export default function TemplateKomunikasi() {
       if (success) {
         toast.success('Template berhasil dihapus');
       }
-    } catch {
-      toast.error('Gagal menghapus template');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Gagal menghapus template'));
     }
   };
 
@@ -215,8 +216,8 @@ export default function TemplateKomunikasi() {
         isActive: true,
       });
       toast.success('Template berhasil diduplikasi');
-    } catch {
-      toast.error('Gagal menduplikasi template');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Gagal menduplikasi template'));
     }
   };
 
@@ -245,10 +246,10 @@ export default function TemplateKomunikasi() {
         <div className="flex items-center gap-3">
           <Select value={channelFilter} onValueChange={setChannelFilter}>
             <SelectTrigger className="w-[160px] h-10 border-[#e2e8f0] dark:border-[#334155]">
-              <SelectValue placeholder="Semua Channel" />
+              <SelectValue placeholder="Semua saluran" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Semua Channel</SelectItem>
+              <SelectItem value="all">Semua saluran</SelectItem>
               <SelectItem value="whatsapp">WhatsApp</SelectItem>
               <SelectItem value="email">Email</SelectItem>
             </SelectContent>
@@ -450,7 +451,7 @@ export default function TemplateKomunikasi() {
 
             <div>
               <Label htmlFor="channel" className="text-[#0f172a] dark:text-[#f8fafc]">
-                Channel <span className="text-[#f43f5e]">*</span>
+                Saluran <span className="text-[#f43f5e]">*</span>
               </Label>
               <Select
                 value={formChannel}

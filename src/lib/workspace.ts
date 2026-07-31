@@ -118,7 +118,7 @@ export async function bootstrapWorkspace(options: BootstrapOptions = {}): Promis
   store.setCurrentEvent(event);
 
   if (!event && options.requireEvent) {
-    throw new Error('Tenant belum memiliki event aktif');
+    throw new Error('Tenant belum memiliki acara aktif');
   }
 
   return { tenant, event };

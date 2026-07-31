@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { Guest, RSVP, Invitation, Checkin, ApiResponse } from '@/types';
 import { normalizeGuestDetail } from '@/lib/normalizers';
+import { getApiErrorMessage } from '@/lib/localization';
 
 type BackendGuestDetail = {
   id: string;
@@ -98,7 +99,7 @@ export function useGuestDetail(guestId: string | undefined): UseGuestDetailRetur
       const res = await api.get<ApiResponse<BackendGuestDetail>>(`/guests/${guestId}`);
       setGuest(res.data.data ? (normalizeGuestDetail(res.data.data) as GuestDetail) : null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memuat detail tamu';
+      const msg = getApiErrorMessage(err, 'Gagal memuat detail tamu');
       setError(msg);
       setGuest(null);
     } finally {

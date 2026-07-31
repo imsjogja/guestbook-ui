@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useEvents } from '@/hooks/useEvents';
 import { useTenantStore } from '@/store/tenantStore';
 import { cn } from '@/lib/utils';
+import { getEventStatusLabel } from '@/lib/localization';
 
 type EventContextSelectorProps = {
   className?: string;
@@ -22,16 +23,7 @@ function formatEventDate(value: string) {
 }
 
 function getStatusLabel(status: string) {
-  switch (status) {
-    case 'published': return 'Dipublikasikan';
-    case 'active': return 'Dipublikasikan';
-    case 'draft': return 'Draft';
-    case 'ongoing': return 'Sedang Berlangsung';
-    case 'paused': return 'Sedang Berlangsung';
-    case 'completed': return 'Selesai';
-    case 'archived': return 'Diarsipkan';
-    default: return status;
-  }
+  return getEventStatusLabel(status);
 }
 
 export default function EventContextSelector({ className, prominent = false }: EventContextSelectorProps) {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import { useTenantStore } from '@/store/tenantStore';
+import { getApiErrorMessage } from '@/lib/localization';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -107,13 +108,12 @@ export function useSubscription() {
       // API wraps in { data: {...} } envelope
       setStatus(response.data.data ?? response.data as unknown as SubscriptionStatus);
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
       // A 401/403 from billing is non-fatal — user just doesn't have a subscription yet
       const status = (err as any)?.response?.status;
       if (status === 401 || status === 403) {
         setStatus(null);
       } else {
-        setError(axiosErr.response?.data?.message ?? 'Gagal memuat status langganan');
+        setError(getApiErrorMessage(err, 'Gagal memuat status langganan'));
       }
     } finally {
       setIsLoading(false);

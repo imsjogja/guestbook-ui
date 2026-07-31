@@ -40,6 +40,7 @@ import { useRSVP, useRSVPReminders, useTemplates } from '@/hooks';
 import { useTenantStore } from '@/store/tenantStore';
 import type { RSVPStatus } from '@/types';
 import { buildRSVPExportCsv, downloadTextFile } from '@/lib/rsvp-csv';
+import { getApiErrorMessage } from '@/lib/localization';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -194,7 +195,7 @@ export default function RSVPPage() {
     try {
       await fetchCandidates();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal memuat kandidat pengingat RSVP');
+      toast.error(getApiErrorMessage(err, 'Gagal memuat kandidat pengingat RSVP'));
     }
   };
 
@@ -217,7 +218,7 @@ export default function RSVPPage() {
       }
       await refetch();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal mengirim pengingat RSVP');
+      toast.error(getApiErrorMessage(err, 'Gagal mengirim pengingat RSVP'));
     } finally {
       setSendingReminder(false);
       setReminderModalOpen(false);
@@ -599,7 +600,7 @@ export default function RSVPPage() {
                             ? 'WA'
                             : r.respondedVia === 'email'
                               ? 'Email'
-                              : 'Manual'}
+                              : 'Pencarian manual'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -660,7 +661,7 @@ export default function RSVPPage() {
           <div className="space-y-4 py-2">
             <div>
               <label className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc] mb-2 block">
-                Channel Pengiriman
+                Saluran Pengiriman
               </label>
               <div className="flex gap-3">
                 {[
@@ -703,7 +704,7 @@ export default function RSVPPage() {
                 </SelectContent>
               </Select>
               {!templatesLoading && channelTemplates.length === 0 && (
-                <p className="text-xs text-[#b45309] mt-2">Belum ada template RSVP follow-up aktif untuk channel ini.</p>
+                <p className="text-xs text-[#b45309] mt-2">Belum ada template tindak lanjut RSVP aktif untuk saluran ini.</p>
               )}
             </div>
 

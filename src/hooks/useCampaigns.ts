@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { Campaign, ApiResponse } from '@/types';
+import { getApiErrorMessage } from '@/lib/localization';
 
 export interface UseCampaignsReturn {
   campaigns: Campaign[];
@@ -24,7 +25,7 @@ export function useCampaigns(): UseCampaignsReturn {
       const res = await api.get<ApiResponse<Campaign[]>>('/campaigns');
       setCampaigns(res.data.data || []);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memuat kampanye';
+      const msg = getApiErrorMessage(err, 'Gagal memuat kampanye');
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -42,7 +43,7 @@ export function useCampaigns(): UseCampaignsReturn {
       setCampaigns((prev) => [newCampaign, ...prev]);
       return newCampaign;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal membuat kampanye';
+      const msg = getApiErrorMessage(err, 'Gagal membuat kampanye');
       setError(msg);
       return null;
     }
@@ -55,7 +56,7 @@ export function useCampaigns(): UseCampaignsReturn {
       setCampaigns((prev) => prev.map((c) => (c.id === id ? updated : c)));
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal menjalankan kampanye';
+      const msg = getApiErrorMessage(err, 'Gagal menjalankan kampanye');
       setError(msg);
       return false;
     }
@@ -68,7 +69,7 @@ export function useCampaigns(): UseCampaignsReturn {
       setCampaigns((prev) => prev.map((c) => (c.id === id ? updated : c)));
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal membatalkan kampanye';
+      const msg = getApiErrorMessage(err, 'Gagal membatalkan kampanye');
       setError(msg);
       return false;
     }

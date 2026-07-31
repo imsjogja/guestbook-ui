@@ -3,6 +3,7 @@ import api from '@/lib/api';
 import type { Checkin } from '@/types';
 import { useTenantStore } from '@/store/tenantStore';
 import { useEventAccess } from './useEventAccess';
+import { getApiErrorMessage as getLocalizedApiErrorMessage } from '@/lib/localization';
 
 interface CheckinStats {
   totalToday: number;
@@ -38,8 +39,7 @@ interface ApiCheckinStats {
 }
 
 function getApiErrorMessage(error: unknown, fallback: string) {
-  const responseData = (error as { response?: { data?: { error?: string; message?: string } } }).response?.data;
-  return responseData?.error ?? responseData?.message ?? fallback;
+  return getLocalizedApiErrorMessage(error, fallback);
 }
 
 function normalizeCheckinMethod(method?: string): Checkin['checkinMethod'] {
@@ -172,10 +172,10 @@ export function useCheckin(eventId?: string, recentLimit = 20) {
       actualPax = 1
     ) => {
       if (!activeEventId) {
-        throw new Error('Event aktif belum dipilih');
+        throw new Error('Acara aktif belum dipilih');
       }
       if (isLoadingAccess || !access?.permissions.includes('checkin:write')) {
-        throw new Error('Role Anda tidak memiliki akses untuk melakukan check-in');
+        throw new Error('Peran Anda tidak memiliki akses untuk melakukan check-in');
       }
 
       try {
@@ -202,10 +202,10 @@ export function useCheckin(eventId?: string, recentLimit = 20) {
   const scanToken = useCallback(
     async (token: string, notes?: string, actualPax = 1) => {
       if (!activeEventId) {
-        throw new Error('Event aktif belum dipilih');
+        throw new Error('Acara aktif belum dipilih');
       }
       if (isLoadingAccess || !access?.permissions.includes('checkin:write')) {
-        throw new Error('Role Anda tidak memiliki akses untuk melakukan check-in');
+        throw new Error('Peran Anda tidak memiliki akses untuk melakukan check-in');
       }
 
       try {
@@ -240,7 +240,7 @@ export function useCheckin(eventId?: string, recentLimit = 20) {
       eventId?: string;
     }) => {
       if (isLoadingAccess || !access?.permissions.includes('checkin:write')) {
-        throw new Error('Role Anda tidak memiliki akses untuk melakukan check-in');
+        throw new Error('Peran Anda tidak memiliki akses untuk melakukan check-in');
       }
 
       try {
@@ -258,7 +258,7 @@ export function useCheckin(eventId?: string, recentLimit = 20) {
         setCheckins((prev) => [newCheckin, ...prev]);
         return newCheckin;
       } catch (err: unknown) {
-        throw new Error(getApiErrorMessage(err, 'Gagal mendaftarkan walk-in'));
+        throw new Error(getApiErrorMessage(err, 'Gagal mendaftarkan tamu langsung'));
       }
     },
     [access, activeEventId, isLoadingAccess]

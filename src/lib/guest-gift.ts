@@ -51,7 +51,7 @@ export function getGiftTypeLabel(value: GuestGift['giftType']): string {
     case 'transfer': return 'Transfer';
     case 'goods': return 'Kado';
     case 'other': return 'Lainnya';
-    default: return 'Gift';
+    default: return 'Lainnya';
   }
 }
 

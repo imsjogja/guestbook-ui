@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
 import type { ApiResponse } from '@/types';
+import { getApiErrorMessage } from '@/lib/localization';
 
 type EventCheckinQR = {
   event_id: string;
@@ -24,8 +25,7 @@ export function useEventCheckinQR(eventId?: string) {
       const response = await api.get<ApiResponse<EventCheckinQR>>(`/events/${eventId}/checkin/qr`);
       setQr(response.data.data ?? null);
     } catch (err: unknown) {
-      const responseData = (err as { response?: { data?: { error?: string; message?: string } } }).response?.data;
-      setError(responseData?.error ?? responseData?.message ?? 'Gagal memuat QR acara');
+      setError(getApiErrorMessage(err, 'Gagal memuat QR acara'));
       setQr(null);
     } finally {
       setIsLoading(false);

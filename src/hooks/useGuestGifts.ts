@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '@/lib/api';
 import { buildGiftMap, normalizeGuestGift, type BackendGuestGift } from '@/lib/guest-gift';
 import type { ApiResponse, GuestGift } from '@/types';
+import { getApiErrorMessage as getLocalizedApiErrorMessage } from '@/lib/localization';
 
 type GuestGiftListResponse = ApiResponse<BackendGuestGift[]>;
 
@@ -12,8 +13,7 @@ type GuestGiftPayload = {
 };
 
 function getApiErrorMessage(error: unknown, fallback: string) {
-  const responseData = (error as { response?: { data?: { error?: string; message?: string } } }).response?.data;
-  return responseData?.error ?? responseData?.message ?? fallback;
+  return getLocalizedApiErrorMessage(error, fallback);
 }
 
 export function useGuestGifts(eventId?: string) {

@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { getChannelLabel } from '@/lib/localization';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -53,7 +54,7 @@ type Channel = 'whatsapp' | 'email' | 'both';
 
 const statusConfig: Record<CampaignStatus, { label: string; className: string; icon: React.ReactNode; pulse?: boolean }> = {
   draft: {
-    label: 'Draft',
+    label: 'Draf',
     className: 'bg-[#fef3c7] text-[#d97706] border-[#fde68a]',
     icon: <FileText size={12} />,
   },
@@ -246,7 +247,7 @@ export default function KampanyeKomunikasi() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: 'Kampanye Aktif', value: totalStats.active, icon: <Radio size={20} />, color: 'text-[#10b981]' },
-            { label: 'Tersimpan (Draft)', value: totalStats.draft, icon: <FileText size={20} />, color: 'text-[#f59e0b]' },
+            { label: 'Tersimpan (Draf)', value: totalStats.draft, icon: <FileText size={20} />, color: 'text-[#f59e0b]' },
             { label: 'Terjadwal', value: totalStats.scheduled, icon: <Calendar size={20} />, color: 'text-[#4f46e5]' },
             { label: 'Total Terkirim', value: totalStats.totalSent, icon: <Send size={20} />, color: 'text-[#64748b]' },
           ].map((stat, i) => (
@@ -329,7 +330,7 @@ export default function KampanyeKomunikasi() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-[#f8fafc] dark:bg-[#1e293b]">
-                    {['Nama Kampanye', 'Channel', 'Penerima', 'Status', 'Jadwal', 'Aksi'].map(
+                    {['Nama Kampanye', 'Saluran', 'Penerima', 'Status', 'Jadwal', 'Aksi'].map(
                       (h) => (
                         <th
                           key={h}
@@ -533,7 +534,7 @@ export default function KampanyeKomunikasi() {
                 {wizardStep === 1 && (
                   <>
                     <div>
-                      <Label>Channel <span className="text-[#f43f5e]">*</span></Label>
+                      <Label>Saluran <span className="text-[#f43f5e]">*</span></Label>
                       <Select value={formChannel} onValueChange={(v) => setFormChannel(v as Channel)}>
                         <SelectTrigger className="mt-1.5 h-10">
                           <SelectValue />
@@ -643,8 +644,8 @@ export default function KampanyeKomunikasi() {
                         <span className="text-[#1e293b] dark:text-[#f8fafc] font-medium">{formName || '-'}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-[#94a3b8]">Channel</span>
-                        <span className="text-[#1e293b] dark:text-[#f8fafc] font-medium">{formChannel}</span>
+                        <span className="text-[#94a3b8]">Saluran</span>
+                        <span className="text-[#1e293b] dark:text-[#f8fafc] font-medium">{getChannelLabel(formChannel)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-[#94a3b8]">Penerima</span>
@@ -706,7 +707,7 @@ export default function KampanyeKomunikasi() {
             </DialogHeader>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsLaunchOpen(false)}>
-                Simpan sebagai Draft
+                Simpan sebagai Draf
               </Button>
               <Button onClick={handleLaunch} disabled={isSubmitting} className="bg-[#4f46e5] hover:bg-[#6366f1] text-white gap-2">
                 {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} />}

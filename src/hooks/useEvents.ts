@@ -4,6 +4,7 @@ import type { Event } from '@/types';
 import type { ApiResponse } from '@/types';
 import { normalizeEvent, type BackendEvent } from '@/lib/normalizers';
 import { useTenantStore } from '@/store/tenantStore';
+import { getApiErrorMessage } from '@/lib/localization';
 
 type EventCreatePayload = {
   name: string;
@@ -102,8 +103,7 @@ export function useEvents() {
         useTenantStore.getState().setCurrentEvent(normalized.find((event) => event.id === currentEvent.id) ?? null);
       }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      const msg = axiosErr.response?.data?.message ?? 'Gagal memuat acara';
+      const msg = getApiErrorMessage(err, 'Gagal memuat acara');
       setError(msg);
     } finally {
       if (!silent) setIsLoading(false);
@@ -126,8 +126,7 @@ export function useEvents() {
         useTenantStore.getState().setCurrentEvent(newEvent);
         return newEvent;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal membuat acara');
+        throw new Error(getApiErrorMessage(err, 'Gagal membuat acara'));
       }
     },
     []
@@ -144,8 +143,7 @@ export function useEvents() {
         }
         return updated;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal memperbarui acara');
+        throw new Error(getApiErrorMessage(err, 'Gagal memperbarui acara'));
       }
     },
     []
@@ -157,8 +155,7 @@ export function useEvents() {
         await api.delete(`/events/${id}`);
         setEvents((prev) => prev.filter((e) => e.id !== id));
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal menghapus acara');
+        throw new Error(getApiErrorMessage(err, 'Gagal menghapus acara'));
       }
     },
     []
@@ -172,8 +169,7 @@ export function useEvents() {
         setEvents((prev) => prev.map((e) => (e.id === id ? updated : e)));
         return updated;
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string } } };
-        throw new Error(axiosErr.response?.data?.message ?? 'Gagal mempublikasikan acara');
+        throw new Error(getApiErrorMessage(err, 'Gagal mempublikasikan acara'));
       }
     },
     []

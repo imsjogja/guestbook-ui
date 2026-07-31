@@ -40,6 +40,7 @@ import type { Event, Guest } from '@/types';
 import { formatGiftAmount, getGiftTypeLabel, parseGiftAmount } from '@/lib/guest-gift';
 import { toast } from 'sonner';
 import { useTenantStore } from '@/store/tenantStore';
+import { getApiErrorMessage, getEventStatusLabel as getLocalizedEventStatusLabel } from '@/lib/localization';
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -100,14 +101,7 @@ function formatCheckinTime(value: string) {
 }
 
 function getEventStatusLabel(status: Event['status']) {
-  switch (status) {
-    case 'published': return 'Dipublikasikan';
-    case 'ongoing': return 'Sedang Berlangsung';
-    case 'completed': return 'Selesai';
-    case 'cancelled': return 'Dibatalkan';
-    case 'archived': return 'Diarsipkan';
-    default: return 'Draft';
-  }
+  return getLocalizedEventStatusLabel(status);
 }
 
 type GiftSaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -363,7 +357,7 @@ export default function Tamu() {
       });
       setShowAdd(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal menambah tamu';
+      const msg = getApiErrorMessage(err, 'Gagal menambah tamu');
       setErrorToast(msg);
     } finally {
       setSubmitting(false);
@@ -389,7 +383,7 @@ export default function Tamu() {
       setShowEdit(false);
       setEditingGuest(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memperbarui tamu';
+      const msg = getApiErrorMessage(err, 'Gagal memperbarui tamu');
       setErrorToast(msg);
     } finally {
       setSubmitting(false);
@@ -409,7 +403,7 @@ export default function Tamu() {
       setShowDelete(false);
       setDeletingGuest(null);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal menghapus tamu';
+      const msg = getApiErrorMessage(err, 'Gagal menghapus tamu');
       setErrorToast(msg);
     } finally {
       setSubmitting(false);
@@ -428,7 +422,7 @@ export default function Tamu() {
       await Promise.all(ids.map((id) => deleteGuest(id)));
       setSelectedIds(new Set());
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal menghapus tamu';
+      const msg = getApiErrorMessage(err, 'Gagal menghapus tamu');
       setErrorToast(msg);
     } finally {
       setSubmitting(false);
@@ -449,7 +443,7 @@ export default function Tamu() {
       await sendWhatsApp({ guest_ids: [guest.id], template_id: whatsappTemplate.id });
       toast.success(`WhatsApp untuk ${guest.fullName} berhasil dikirim`);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal mengirim WhatsApp');
+      toast.error(getApiErrorMessage(err, 'Gagal mengirim WhatsApp'));
     }
   };
 
@@ -506,7 +500,7 @@ export default function Tamu() {
         setSelectedImportFile(null);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal mengimpor CSV';
+      const msg = getApiErrorMessage(err, 'Gagal mengimpor CSV');
       setErrorToast(msg);
     } finally {
       setImporting(false);
@@ -521,7 +515,7 @@ export default function Tamu() {
       await downloadTemplateCSV();
       toast.success('Template CSV berhasil diunduh');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal mengunduh template CSV';
+      const msg = getApiErrorMessage(err, 'Gagal mengunduh template CSV');
       setErrorToast(msg);
     } finally {
       setTemplateDownloading(false);
@@ -535,7 +529,7 @@ export default function Tamu() {
       const exportedCount = await exportGuestsCSV();
       toast.success(`Berhasil mengekspor ${exportedCount} tamu`);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal mengekspor CSV';
+      const msg = getApiErrorMessage(err, 'Gagal mengekspor CSV');
       setErrorToast(msg);
     } finally {
       setExporting(false);

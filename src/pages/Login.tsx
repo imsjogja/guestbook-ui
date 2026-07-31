@@ -124,7 +124,7 @@ export default function Login() {
                 ))}
               </div>
               <p className="text-sm text-white/75">
-                <span className="font-semibold text-white">1,200+</span> event organizer mempercayai GuestFlow
+                <span className="font-semibold text-white">1.200+</span> penyelenggara acara mempercayai GuestFlow
               </p>
             </div>
           </motion.div>

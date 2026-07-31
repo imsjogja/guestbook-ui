@@ -44,6 +44,7 @@ import { QRCodeSVG } from '@/components/QRCodeSVG';
 import { toast } from 'sonner';
 import { getInvitationGuestDisplay } from '@/lib/invitation-display';
 import { WhatsAppOnboardingCard } from '@/components/WhatsAppOnboardingCard';
+import { getApiErrorMessage, getChannelLabel } from '@/lib/localization';
 
 /* ── Extended UI Type ─────────────────────────────── */
 type InvitationStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | 'revoked';
@@ -92,7 +93,7 @@ const statusConfig: Record<
     dotClass: 'bg-[#f59e0b]',
   },
   sent: {
-    label: 'Diterima Provider',
+    label: 'Diterima provider',
     icon: <Send size={14} />,
     badgeClass: 'bg-[#f1f5f9] text-[#475569] border-[#cbd5e1]',
     dotClass: 'bg-[#64748b]',
@@ -308,7 +309,7 @@ export default function Undangan() {
         toast.success('Undangan dikirim ulang');
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal mengirim ulang undangan');
+      toast.error(getApiErrorMessage(err, 'Gagal mengirim ulang undangan'));
     }
   };
 
@@ -348,7 +349,7 @@ export default function Undangan() {
       try {
         await ensureReady();
       } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : 'WhatsApp belum siap digunakan');
+        toast.error(getApiErrorMessage(err, 'WhatsApp belum siap digunakan'));
         return;
       }
     }
@@ -373,7 +374,7 @@ export default function Undangan() {
         }
       } catch (err: unknown) {
         await refresh();
-        toast.error(err instanceof Error ? err.message : `Gagal mengirim ${batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'}`);
+        toast.error(getApiErrorMessage(err, `Gagal mengirim ${getChannelLabel(batchChannel)}`));
       }
     }
     setBatchModalOpen(false);
@@ -384,7 +385,7 @@ export default function Undangan() {
     try {
       await ensureReady();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'WhatsApp belum siap digunakan');
+      toast.error(getApiErrorMessage(err, 'WhatsApp belum siap digunakan'));
       return;
     }
     setSendTargetIds(guestIds);
@@ -410,7 +411,7 @@ export default function Undangan() {
       setSelectedIds(new Set());
     } catch (err: unknown) {
       await refresh();
-      toast.error(err instanceof Error ? err.message : 'Gagal mengirim WhatsApp');
+      toast.error(getApiErrorMessage(err, 'Gagal mengirim WhatsApp'));
     }
   };
 
@@ -515,7 +516,7 @@ export default function Undangan() {
       {/* Stats Bar */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         {[
-          { label: 'Diterima Provider', value: stats.totalSent, icon: <Send size={16} />, color: 'text-[#4f46e5]', bg: 'bg-[#eef2ff]' },
+          { label: 'Diterima provider', value: stats.totalSent, icon: <Send size={16} />, color: 'text-[#4f46e5]', bg: 'bg-[#eef2ff]' },
           { label: 'Tersampaikan (WA)', value: stats.whatsappDelivered, icon: <MessageCircle size={16} />, color: 'text-[#10b981]', bg: 'bg-[#d1fae5]' },
           { label: 'Dibaca', value: stats.read, icon: <Eye size={16} />, color: 'text-[#4f46e5]', bg: 'bg-[#eef2ff]' },
           { label: 'Belum Dikirim', value: stats.pending, icon: <Clock size={16} />, color: 'text-[#f59e0b]', bg: 'bg-[#fef3c7]' },
@@ -550,10 +551,10 @@ export default function Undangan() {
         </div>
         <Select value={channelFilter} onValueChange={setChannelFilter}>
           <SelectTrigger className="h-9 w-[160px] text-sm">
-            <SelectValue placeholder="Semua Channel" />
+            <SelectValue placeholder="Semua saluran" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Semua Channel</SelectItem>
+            <SelectItem value="all">Semua saluran</SelectItem>
             <SelectItem value="whatsapp">WhatsApp</SelectItem>
             <SelectItem value="email">Email</SelectItem>
           </SelectContent>
@@ -595,7 +596,7 @@ export default function Undangan() {
                   Template
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">
-                  Channel
+                  Saluran
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-[#64748b]">
                   Status
@@ -688,13 +689,13 @@ export default function Undangan() {
                           {cfg.label}
                         </span>
                         {inv.status === 'sent' && inv.providerHttpStatus && (
-                          <span className="block mt-1 text-[10px] text-[#94a3b8]" title="Bukti provider menerima request">
-                            Provider HTTP {inv.providerHttpStatus}
+                          <span className="block mt-1 text-[10px] text-[#94a3b8]" title="Bukti layanan menerima permintaan">
+                            Respons layanan HTTP {inv.providerHttpStatus}
                           </span>
                         )}
                         {inv.status === 'sent' && !inv.providerHttpStatus && (
-                          <span className="block mt-1 text-[10px] text-[#b45309]" title="Pesan dibuat sebelum receipt provider disimpan">
-                            Receipt provider belum tercatat
+                          <span className="block mt-1 text-[10px] text-[#b45309]" title="Pesan dibuat sebelum bukti respons layanan disimpan">
+                            Bukti respons layanan belum tercatat
                           </span>
                         )}
                         {inv.status === 'failed' && inv.failedReason && (
@@ -930,7 +931,7 @@ export default function Undangan() {
             <div className="space-y-4 py-2">
               <div>
                 <label className="text-sm font-medium text-[#1e293b] dark:text-[#f8fafc] mb-2 block">
-                  Channel Pengiriman
+                  Saluran Pengiriman
                 </label>
                 <div className="flex gap-3">
                   {[
@@ -991,7 +992,7 @@ export default function Undangan() {
                 </p>
               ) : (
                 <p className="text-sm text-[#64748b]">
-                  Channel: {batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'}
+                  Saluran: {batchChannel === 'whatsapp' ? 'WhatsApp' : 'Email'}
                   {batchTemplateId ? ` menggunakan ${(batchChannel === 'whatsapp' ? whatsappTemplates : emailTemplates).find((template) => template.id === batchTemplateId)?.name || 'template terpilih'}` : ''}
                 </p>
               )}

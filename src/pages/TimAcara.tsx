@@ -6,6 +6,7 @@ import { useEventMembers } from '@/hooks/useEventMembers';
 import { useTeam } from '@/hooks/useTeam';
 import { useTenantStore } from '@/store/tenantStore';
 import type { EventRole } from '@/types';
+import { getApiErrorMessage, getRoleLabel } from '@/lib/localization';
 
 const roleConfig: Record<EventRole, { label: string; description: string; className: string }> = {
   rsvp_officer: {
@@ -19,7 +20,7 @@ const roleConfig: Record<EventRole, { label: string; description: string; classN
     className: 'bg-[#ecfdf5] text-[#047857] border-[#a7f3d0]',
   },
   usher: {
-    label: 'Usher',
+    label: 'Petugas penerima tamu',
     description: 'Membantu kedatangan dan tempat duduk tamu.',
     className: 'bg-[#fff7ed] text-[#c2410c] border-[#fed7aa]',
   },
@@ -29,7 +30,7 @@ const roleConfig: Record<EventRole, { label: string; description: string; classN
     className: 'bg-[#fdf4ff] text-[#a21caf] border-[#f5d0fe]',
   },
   viewer: {
-    label: 'Viewer Acara',
+    label: 'Pengamat acara',
     description: 'Akses baca untuk data acara.',
     className: 'bg-[#f8fafc] text-[#475569] border-[#e2e8f0]',
   },
@@ -67,7 +68,7 @@ export default function TimAcara() {
       setSelectedUserId('');
       toast.success('Anggota berhasil ditambahkan ke acara');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal menambahkan anggota acara');
+      toast.error(getApiErrorMessage(err, 'Gagal menambahkan anggota acara'));
     } finally {
       setIsSaving(false);
     }
@@ -76,9 +77,9 @@ export default function TimAcara() {
   const handleRoleChange = async (userId: string, role: EventRole) => {
     try {
       await updateMemberRole(userId, role);
-      toast.success('Role acara diperbarui');
+      toast.success('Peran acara diperbarui');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal memperbarui role acara');
+      toast.error(getApiErrorMessage(err, 'Gagal memperbarui peran acara'));
     }
   };
 
@@ -88,7 +89,7 @@ export default function TimAcara() {
       await removeMember(userId);
       toast.success('Akses acara dicabut');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal mencabut akses acara');
+      toast.error(getApiErrorMessage(err, 'Gagal mencabut akses acara'));
     }
   };
 
@@ -122,7 +123,7 @@ export default function TimAcara() {
       {access && (
         <div className="flex items-center gap-3 rounded-xl border border-[#c7d2fe] bg-[#eef2ff] px-4 py-3 text-sm text-[#3730a3]">
           <ShieldCheck size={17} />
-          <span>Akses Anda: <strong>{access.role}</strong> ({access.scope === 'tenant' ? 'seluruh tenant' : 'acara ini'})</span>
+          <span>Akses Anda: <strong>{getRoleLabel(access.role)}</strong> ({access.scope === 'tenant' ? 'seluruh tenant' : 'acara ini'})</span>
         </div>
       )}
 
@@ -155,7 +156,7 @@ export default function TimAcara() {
         <div className="flex items-center justify-between border-b border-[#e2e8f0] px-5 py-4 dark:border-[#334155]">
           <div>
             <h2 className="font-semibold text-[#0f172a] dark:text-[#f8fafc]">Anggota yang ditugaskan</h2>
-            <p className="mt-1 text-sm text-[#64748b]">{members.length} anggota event-specific</p>
+            <p className="mt-1 text-sm text-[#64748b]">{members.length} anggota khusus acara</p>
           </div>
         </div>
         {isLoading ? (

@@ -4,6 +4,7 @@ import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { isAuthResponse } from '@/lib/auth-session';
 import { useAuthStore } from '@/store/authStore';
+import { getApiErrorMessage } from '@/lib/localization';
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
@@ -35,11 +36,12 @@ export default function VerifyEmail() {
         window.setTimeout(() => navigate('/', { replace: true }), 350);
       })
       .catch((error: unknown) => {
-        const response = error as { response?: { data?: { message?: string } } };
         setState('error');
         setMessage(
-          response.response?.data?.message ??
-          (error instanceof Error ? error.message : 'Tautan verifikasi tidak valid atau sudah kedaluwarsa.')
+          getApiErrorMessage(
+            error,
+            error instanceof Error ? error.message : 'Tautan verifikasi tidak valid atau sudah kedaluwarsa.'
+          )
         );
       });
   }, [navigate, searchParams, storeLogin]);

@@ -117,13 +117,13 @@ export default function Register() {
               Mulai kelola acara Anda dengan alur yang lebih rapi.
             </h2>
             <p className="text-white/75 leading-relaxed max-w-lg">
-              Daftar sebagai Tenant Owner, verifikasi email, lalu siapkan acara,
+              Daftar sebagai Pemilik tenant, verifikasi email, lalu siapkan acara,
               tamu, undangan, RSVP, dan check-in dalam satu workspace.
             </p>
             <div className="mt-8 grid grid-cols-3 gap-4">
               {[
                 { label: 'Trial', value: '14 hari' },
-                { label: 'Role', value: 'Owner' },
+                { label: 'Peran', value: 'Pemilik' },
                 { label: 'Email', value: 'Wajib' },
               ].map((stat) => (
                 <div key={stat.label} className="text-center">
@@ -182,7 +182,7 @@ export default function Register() {
                   Cek email Anda
                 </h2>
                 <p className="text-sm text-[#64748b] leading-relaxed">
-                  Tautan verifikasi akan dikirim ke <strong className="text-[#1e293b]">{email}</strong>. Verifikasi email sebelum masuk ke GuestFlow sebagai Tenant Owner.
+                  Tautan verifikasi akan dikirim ke <strong className="text-[#1e293b]">{email}</strong>. Verifikasi email sebelum masuk ke GuestFlow sebagai Pemilik tenant.
                 </p>
                 {error && (
                   <p className="mt-4 px-3 py-2 rounded-lg bg-[#fff1f2] text-sm text-[#e11d48]">
@@ -280,7 +280,7 @@ export default function Register() {
                     className="w-full h-10 pl-9 pr-3 rounded-lg border border-[#e2e8f0] dark:border-[#334155] bg-white dark:bg-[#0b0f19] text-sm text-[#0f172a] dark:text-[#f8fafc] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all"
                   />
                 </div>
-                <p className="mt-1 text-[11px] text-[#94a3b8]">Anda otomatis menjadi Tenant Owner workspace ini.</p>
+                <p className="mt-1 text-[11px] text-[#94a3b8]">Anda otomatis menjadi Pemilik tenant workspace ini.</p>
               </div>
 
               {/* Password */}

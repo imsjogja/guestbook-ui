@@ -6,6 +6,7 @@ import WorkspaceOnboarding from './WorkspaceOnboarding';
 import { bootstrapWorkspace } from '@/lib/workspace';
 import { useAuthStore } from '@/store/authStore';
 import { useTenantStore } from '@/store/tenantStore';
+import { getApiErrorMessage } from '@/lib/localization';
 
 function FullScreenLoader() {
   return (
@@ -50,7 +51,7 @@ export default function AuthenticatedLayout() {
         setBootstrapError(null);
         await bootstrapWorkspace({ requireTenant: false, requireEvent: false });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Gagal menyiapkan workspace';
+        const message = getApiErrorMessage(error, 'Gagal menyiapkan workspace');
         if (!cancelled) {
           setBootstrapError(message);
         }
